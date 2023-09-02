@@ -1,0 +1,3 @@
+#!/bin/bash
+
+sed -i '/kpfleming/ {s^ github://kpfleming/esphome-influxdb_oss_v2.*$^\n      type: local\n      path: ../components^}' ${1}

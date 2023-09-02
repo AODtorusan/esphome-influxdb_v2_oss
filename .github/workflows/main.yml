@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+    types:
+    - opened
+    - reopened
+    - synchronize
+    branches:
+      - main
+
+jobs:
+  esphome_release:
+    name: Test with current release of ESPHome
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+      - uses: actions/checkout@v3
+      - name: Install ESPHome
+        run: pip install esphome
+      - name: Test compilation of minimal example
+        run: |-
+          workflow-support/fix-example-for-ci examples/minimal.yml
+          cd examples
+          esphome compile minimal.yml
+      - name: Test compilation of full example
+        run: |-
+          workflow-support/fix-example-for-ci examples/full.yml
+          cd examples
+          esphome compile full.yml
+
+  esphome_dev:
+    name: Test with dev version of ESPHome
+    runs-on: ubuntu-latest
+    env:
+      ESPHOME_NO_VENV: true
+    steps:
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+      - uses: actions/checkout@v3
+      - name: Get ESPHome dev branch
+        uses: actions/checkout@v3
+        with:
+          repository: esphome/esphome
+          ref: dev
+          path: esphome
+      - name: Install ESPHome
+        run: |-
+          esphome/script/setup
+      - name: Test compilation of minimal example
+        run: |-
+          workflow-support/fix-example-for-ci examples/minimal.yml
+          cd examples
+          esphome compile minimal.yml
+      - name: Test compilation of full example
+        run: |-
+          workflow-support/fix-example-for-ci examples/full.yml
+          cd examples
+          esphome compile full.yml
