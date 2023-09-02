@@ -1,3 +1,5 @@
+from esphome import automation
+from esphome.automation import LambdaAction
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.const import (
@@ -23,6 +25,7 @@ CODEOWNERS = ["@kpfleming"]
 
 CONF_BUCKET = "bucket"
 CONF_MEASUREMENTS = "measurements"
+CONF_MEASUREMENT_ID = "measurement_id"
 CONF_ORGANIZATION = "organization"
 CONF_RAW_VALUE = "raw_value"
 CONF_TAGS = "tags"
@@ -114,3 +117,18 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Required(CONF_MEASUREMENTS): cv.ensure_list(MEASUREMENT_SCHEMA),
     }
 ).extend(cv.COMPONENT_SCHEMA)
+
+CONF_INFLUXDB_OSS_V2_PUBLISH = "influxdb_oss_v2.publish"
+INFLUXDB_OSS_V2_PUBLISH_ACTION_SCHEMA = cv.maybe_simple_value(
+    {
+        cv.GenerateID(CONF_MEASUREMENT_ID): cv.use_id(Measurement),
+    },
+    key=CONF_MEASUREMENT_ID,
+)
+
+
+@automation.register_action(
+    CONF_INFLUXDB_OSS_V2_PUBLISH, LambdaAction, INFLUXDB_OSS_V2_PUBLISH_ACTION_SCHEMA
+)
+async def influxdb_oss_v2_publish_action_to_code(config, action_id, template_arg, args):
+    pass
