@@ -56,7 +56,7 @@ public:
   void set_sensor(const binary_sensor::BinarySensor *sensor) { this->sensor_ = sensor; }
   void set_field_name(const char *name) { this->field_name_ = name; }
 
-  void publish(std::ostringstream &line) const;
+  bool publish(std::ostringstream &line) const;
 
 protected:
   const binary_sensor::BinarySensor *sensor_;
@@ -82,7 +82,7 @@ public:
   }
   void set_raw_state(bool val) { this->raw_state_ = val; }
 
-  void publish(std::ostringstream &line) const;
+  bool publish(std::ostringstream &line) const;
 
 protected:
   const sensor::Sensor *sensor_;
@@ -95,14 +95,14 @@ protected:
 #ifdef USE_TEXT_SENSOR
 class TextSensorField {
 public:
-  void set_sensor(const text_sensor::TextSensor *sensor) { this->sensor_ = sensor; }
+  void set_sensor(text_sensor::TextSensor *sensor) { this->sensor_ = sensor; }
   void set_field_name(const char *name) { this->field_name_ = name; }
   void set_raw_state(bool val) { this->raw_state_ = val; }
 
-  void publish(std::ostringstream &line) const;
+  bool publish(std::ostringstream &line) const;
 
 protected:
-  const text_sensor::TextSensor *sensor_;
+  text_sensor::TextSensor *sensor_;
   const char *field_name_{nullptr};
   bool raw_state_{false};
 };

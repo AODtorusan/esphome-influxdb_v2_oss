@@ -4,7 +4,11 @@ namespace esphome {
 namespace influxdb {
 
 #ifdef USE_BINARY_SENSOR
-void BinarySensorField::publish(std::ostringstream &line) const {
+bool BinarySensorField::publish(std::ostringstream &line) const {
+  if (!this->sensor_->has_state()) {
+    return false;
+  }
+
   if (this->field_name_ != nullptr) {
     line << this->field_name_;
   } else {
@@ -12,11 +16,17 @@ void BinarySensorField::publish(std::ostringstream &line) const {
   }
 
   line << '=' << (this->sensor_->state ? 'T' : 'F');
+
+  return true;
 }
 #endif
 
 #ifdef USE_SENSOR
-void SensorField::publish(std::ostringstream &line) const {
+bool SensorField::publish(std::ostringstream &line) const {
+  if (!this->sensor_->has_state()) {
+    return false;
+  }
+
   if (this->field_name_ != nullptr) {
     line << this->field_name_;
   } else {
@@ -44,11 +54,17 @@ void SensorField::publish(std::ostringstream &line) const {
     line << std::setprecision(0) << std::abs(state) << 'u';
     break;
   }
+
+  return true;
 }
 #endif
 
 #ifdef USE_TEXT_SENSOR
-void TextSensorField::publish(std::ostringstream &line) const {
+bool TextSensorField::publish(std::ostringstream &line) const {
+  if (!this->sensor_->has_state()) {
+    return false;
+  }
+
   if (this->field_name_ != nullptr) {
     line << this->field_name_;
   } else {
@@ -64,37 +80,48 @@ void TextSensorField::publish(std::ostringstream &line) const {
   }
 
   line << '"';
+
+  return true;
 }
 #endif
 
 void Measurement::publish() {
   std::ostringstream line;
 
-  line << this->line_prefix_;
+  line << this->line_prefix_ << ' ';
 
-  char sensor_sep = ' ';
+  std::string sensor_sep;
 
 #ifdef USE_BINARY_SENSOR
   for (const auto sensor_field : this->binary_sensor_fields_) {
     line << sensor_sep;
-    sensor_field->publish(line);
-    sensor_sep = ',';
+    if (sensor_field->publish(line)) {
+      sensor_sep = ",";
+    } else {
+      sensor_sep = "";
+    }
   }
 #endif
 
 #ifdef USE_SENSOR
   for (const auto sensor_field : this->sensor_fields_) {
     line << sensor_sep;
-    sensor_field->publish(line);
-    sensor_sep = ',';
+    if (sensor_field->publish(line)) {
+      sensor_sep = ",";
+    } else {
+      sensor_sep = "";
+    }
   }
 #endif
 
 #ifdef USE_TEXT_SENSOR
   for (const auto sensor_field : this->text_sensor_fields_) {
     line << sensor_sep;
-    sensor_field->publish(line);
-    sensor_sep = ',';
+    if (sensor_field->publish(line)) {
+      sensor_sep = ",";
+    } else {
+      sensor_sep = "";
+    }
   }
 #endif
 
