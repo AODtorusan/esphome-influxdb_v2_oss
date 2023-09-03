@@ -186,7 +186,7 @@ async def to_code(config):
 
         cg.add(
             meas.set_line_prefix(
-                f"{escape_identifier(measurement[CONF_NAME])}{parent_tag_string}{tag_string} "
+                f"{escape_identifier(measurement[CONF_NAME])}{parent_tag_string}{tag_string}"
             )
         )
 
@@ -199,7 +199,7 @@ async def to_code(config):
                 if name := conf.get(CONF_NAME):
                     cg.add(var.set_name(escape_identifier(name)))
 
-                cg.add(meas.add_binary_sensor(var))
+                cg.add(meas.add_binary_sensor_field(var))
 
         if sensors := measurement.get(CONF_SENSORS):
             for conf in sensors:
@@ -213,7 +213,7 @@ async def to_code(config):
                 if name := conf.get(CONF_NAME):
                     cg.add(var.set_name(escape_identifier(name)))
 
-                cg.add(meas.add_sensor(var))
+                cg.add(meas.add_sensor_field(var))
 
         if text_sensors := measurement.get(CONF_TEXT_SENSORS):
             for conf in text_sensors:
@@ -226,7 +226,7 @@ async def to_code(config):
                 if name := conf.get(CONF_NAME):
                     cg.add(var.set_name(escape_identifier(name)))
 
-                cg.add(meas.add_text_sensor(var))
+                cg.add(meas.add_text_sensor_field(var))
 
 
 CONF_INFLUXDB_PUBLISH = "influxdb.publish"
