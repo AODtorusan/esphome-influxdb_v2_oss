@@ -50,27 +50,39 @@ protected:
 #endif
 };
 
+class Field {
+public:
+  void set_field_name(const char *name) { this->field_name_ = name; }
+  const char *get_field_name() const { return this->field_name_; }
+
+  virtual bool sensor_has_state() const = 0;
+  virtual std::string sensor_object_id() const = 0;
+  virtual void publish(std::ostringstream &line) const = 0;
+
+protected:
+  const char *field_name_{nullptr};
+};
+
 #ifdef USE_BINARY_SENSOR
-class BinarySensorField {
+class BinarySensorField : public Field {
 public:
   void set_sensor(const binary_sensor::BinarySensor *sensor) { this->sensor_ = sensor; }
-  void set_field_name(const char *name) { this->field_name_ = name; }
 
-  bool publish(std::ostringstream &line) const;
+  bool sensor_has_state() const override { return this->sensor_->has_state(); }
+  std::string sensor_object_id() const override { return this->sensor_->get_object_id(); }
+  void publish(std::ostringstream &line) const override;
 
 protected:
   const binary_sensor::BinarySensor *sensor_;
-  const char *field_name_{nullptr};
 };
 #endif
 
 #ifdef USE_SENSOR
 enum class SensorFieldFormat { Float, Integer, UnsignedInteger };
 
-class SensorField {
+class SensorField : public Field {
 public:
   void set_sensor(const sensor::Sensor *sensor) { this->sensor_ = sensor; }
-  void set_field_name(const char *name) { this->field_name_ = name; }
   void set_format(const char *format) {
     if (format[0] == 'f') {
       this->format_ = SensorFieldFormat::Float;
@@ -82,28 +94,29 @@ public:
   }
   void set_raw_state(bool val) { this->raw_state_ = val; }
 
-  bool publish(std::ostringstream &line) const;
+  bool sensor_has_state() const override { return this->sensor_->has_state(); }
+  std::string sensor_object_id() const override { return this->sensor_->get_object_id(); }
+  void publish(std::ostringstream &line) const override;
 
 protected:
   const sensor::Sensor *sensor_;
-  const char *field_name_{nullptr};
   SensorFieldFormat format_;
   bool raw_state_{false};
 };
 #endif
 
 #ifdef USE_TEXT_SENSOR
-class TextSensorField {
+class TextSensorField : public Field {
 public:
   void set_sensor(text_sensor::TextSensor *sensor) { this->sensor_ = sensor; }
-  void set_field_name(const char *name) { this->field_name_ = name; }
   void set_raw_state(bool val) { this->raw_state_ = val; }
 
-  bool publish(std::ostringstream &line) const;
+  bool sensor_has_state() const override { return this->sensor_->has_state(); }
+  std::string sensor_object_id() const override { return this->sensor_->get_object_id(); }
+  void publish(std::ostringstream &line) const override;
 
 protected:
   text_sensor::TextSensor *sensor_;
-  const char *field_name_{nullptr};
   bool raw_state_{false};
 };
 #endif
@@ -115,15 +128,15 @@ public:
   void set_line_prefix(const char *prefix) { this->line_prefix_ = prefix; }
 
 #ifdef USE_BINARY_SENSOR
-  void add_binary_sensor_field(const BinarySensorField *sensor) { this->binary_sensor_fields_.push_back(sensor); }
+  void add_binary_sensor_field(const BinarySensorField *sensor) { this->fields_.push_back(sensor); }
 #endif
 
 #ifdef USE_SENSOR
-  void add_sensor_field(const SensorField *sensor) { this->sensor_fields_.push_back(sensor); }
+  void add_sensor_field(const SensorField *sensor) { this->fields_.push_back(sensor); }
 #endif
 
 #ifdef USE_TEXT_SENSOR
-  void add_text_sensor_field(const TextSensorField *sensor) { this->text_sensor_fields_.push_back(sensor); }
+  void add_text_sensor_field(const TextSensorField *sensor) { this->fields_.push_back(sensor); }
 #endif
 
   void publish();
@@ -131,18 +144,7 @@ public:
 protected:
   InfluxDB *parent_;
   const char *line_prefix_;
-
-#ifdef USE_BINARY_SENSOR
-  std::vector<const BinarySensorField *> binary_sensor_fields_;
-#endif
-
-#ifdef USE_SENSOR
-  std::vector<const SensorField *> sensor_fields_;
-#endif
-
-#ifdef USE_TEXT_SENSOR
-  std::vector<const TextSensorField *> text_sensor_fields_;
-#endif
+  std::vector<const Field *> fields_;
 };
 
 }  // namespace influxdb
