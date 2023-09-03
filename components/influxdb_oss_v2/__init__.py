@@ -58,7 +58,7 @@ def validate_measurement_config(config):
 MEASUREMENT_SCHEMA = cv.All(
     cv.Schema(
         {
-            cv.GenerateID(): cv.declare_id(Measurement),
+            cv.Required(CONF_ID): cv.declare_id(Measurement),
             cv.Required(CONF_NAME): cv.validate_id_name,
             cv.Optional(CONF_TAGS): cv.Schema({cv.string: cv.string}),
             cv.Optional(CONF_BINARY_SENSORS): cv.ensure_list(
@@ -118,8 +118,44 @@ CONFIG_SCHEMA = cv.Schema(
     }
 ).extend(cv.COMPONENT_SCHEMA)
 
-CONF_INFLUXDB_OSS_V2_PUBLISH = "influxdb_oss_v2.publish"
-INFLUXDB_OSS_V2_PUBLISH_ACTION_SCHEMA = cv.maybe_simple_value(
+
+async def to_code(config):
+    db = cg.new_Pvariable(config[CONF_ID])
+    await cg.register_component(db, config)
+
+    url = config[CONF_URL]
+    if url[-1] == "/":
+        url = url[0:-1]
+
+    org = config[CONF_ORGANIZATION]
+    bucket = config[CONF_BUCKET]
+
+    cg.add(db.set_url(f"{url}/api/v2/write?org={org}&bucket={bucket}"))
+
+    if token := config.get(CONF_TOKEN):
+        cg.add(db.set_token(token))
+
+    if useragent := config.get(CONF_USERAGENT):
+        cg.add(db.set_useragent(useragent))
+
+    if clock_id := config.get(CONF_TIME_ID):
+        clock = await cg.get_variable(clock_id)
+        cg.add(db.set_clock(clock))
+
+    if tags := config.get(CONF_TAGS):
+        for k, v in tags.items():
+            cg.add(db.add_tag(k, v))
+
+    for measurement in config.get(CONF_MEASUREMENTS):
+        meas = cg.new_Pvariable(measurement[CONF_ID], db)
+
+        if tags := measurement.get(CONF_TAGS):
+            for k, v in tags.items():
+                cg.add(meas.add_tag(k, v))
+
+
+CONF_INFLUXDB_PUBLISH = "influxdb.publish"
+INFLUXDB_PUBLISH_ACTION_SCHEMA = cv.maybe_simple_value(
     {
         cv.GenerateID(CONF_MEASUREMENT_ID): cv.use_id(Measurement),
     },
@@ -128,7 +164,7 @@ INFLUXDB_OSS_V2_PUBLISH_ACTION_SCHEMA = cv.maybe_simple_value(
 
 
 @automation.register_action(
-    CONF_INFLUXDB_OSS_V2_PUBLISH, LambdaAction, INFLUXDB_OSS_V2_PUBLISH_ACTION_SCHEMA
+    CONF_INFLUXDB_PUBLISH, LambdaAction, INFLUXDB_PUBLISH_ACTION_SCHEMA
 )
-async def influxdb_oss_v2_publish_action_to_code(config, action_id, template_arg, args):
+async def influxdb_publish_action_to_code(config, action_id, template_arg, args):
     pass
