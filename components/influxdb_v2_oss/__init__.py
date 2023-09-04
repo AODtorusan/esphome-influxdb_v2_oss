@@ -99,7 +99,7 @@ MEASUREMENT_SCHEMA = cv.All(
                                 SENSOR_FORMATS
                             ),
                             cv.Optional(
-                                CONF_ACCURACY_DECIMALS
+                                CONF_ACCURACY_DECIMALS,
                             ): cv.positive_not_null_int,
                             cv.Optional(CONF_RAW_STATE, default=False): cv.boolean,
                         }

@@ -4,14 +4,13 @@ namespace esphome {
 namespace influxdb {
 
 #ifdef USE_BINARY_SENSOR
-void BinarySensorField::publish(std::ostringstream &line) const {
-  line << (this->sensor_->state ? 'T' : 'F');
+void BinarySensorField::publish(std::string &line) const {
+  line += (this->sensor_->state ? 'T' : 'F');
 }
 #endif
 
 #ifdef USE_SENSOR
-void SensorField::publish(std::ostringstream &line) const {
-  const auto default_precision {std::cout.precision()};
+void SensorField::publish(std::string &line) const {
   float state;
 
   if (this->raw_state_) {
@@ -22,41 +21,34 @@ void SensorField::publish(std::ostringstream &line) const {
 
   switch (this->format_) {
   case SensorFieldFormat::Float:
-    if (this->accuracy_decimals_ != -1) {
-      line << std::scientific << std::setprecision(this->accuracy_decimals_) << state << std::defaultfloat << std::setprecision(default_precision);
-    } else {
-      line << std::scientific << state << std::defaultfloat;
-    }
+    line += value_accuracy_to_string(state, this->accuracy_decimals_);
     break;
   case SensorFieldFormat::Integer:
-    line << std::setprecision(0) << state << 'i' << std::setprecision(default_precision);
+    line += str_sprintf("%ldi", std::lroundf(state));
     break;
   case SensorFieldFormat::UnsignedInteger:
-    line << std::setprecision(0) << std::abs(state) << 'u' << std::setprecision(default_precision);
+    line += str_sprintf("%ldu", std::lroundf(std::abs(state)));
     break;
   }
 }
 #endif
 
 #ifdef USE_TEXT_SENSOR
-void TextSensorField::publish(std::ostringstream &line) const {
-  line << '"';
+void TextSensorField::publish(std::string &line) const {
+  line += '"';
 
   if (this->raw_state_) {
-    line << this->sensor_->get_raw_state();
+    line += this->sensor_->get_raw_state();
   } else {
-    line << this->sensor_->get_state();
+    line += this->sensor_->get_state();
   }
 
-  line << '"';
+  line += '"';
 }
 #endif
 
 void Measurement::publish() {
-  std::ostringstream line;
-
-  line << this->line_prefix_ << ' ';
-
+  std::string line{this->line_prefix_};
   char sensor_sep = ' ';
 
   for (const auto field : this->fields_) {
@@ -64,15 +56,15 @@ void Measurement::publish() {
       continue;
     }
 
-    line << sensor_sep;
+    line += sensor_sep;
 
-    if (field->get_field_name() != nullptr) {
-      line << field->get_field_name();
+    if (!field->get_field_name().empty()) {
+      line += field->get_field_name();
     } else {
-      line << field->sensor_object_id();
+      line += field->sensor_object_id();
     }
 
-    line << '=';
+    line += '=';
 
     field->publish(line);
 
@@ -109,16 +101,16 @@ void InfluxDB::setup() {
   this->http_request_->set_headers(headers);
 }
 
-void InfluxDB::publish_measurement(const std::string &url, std::ostringstream &measurement) {
+void InfluxDB::publish_measurement(const std::string &url, std::string &measurement) {
   if (this->clock_ != nullptr) {
     auto time = this->clock_->now();
-    measurement << time.strftime(" %s");
+    measurement += time.strftime(" %s");
   }
 
-  ESP_LOGD(TAG, "Publishing: %s", measurement.str().c_str());
+  ESP_LOGD(TAG, "Publishing: %s", measurement.c_str());
 
   this->http_request_->set_url(url.c_str());
-  this->http_request_->set_body(measurement.str().c_str());
+  this->http_request_->set_body(measurement.c_str());
   this->http_request_->send({});
   this->http_request_->close();
   // check response code
