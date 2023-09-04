@@ -4,6 +4,7 @@ from esphome.core import Lambda
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.const import (
+    CONF_ACCURACY_DECIMALS,
     CONF_BINARY_SENSORS,
     CONF_FORMAT,
     CONF_ID,
@@ -15,8 +16,7 @@ from esphome.const import (
     CONF_URL,
 )
 from esphome.components.http_request import (
-    CONF_USERAGENT,
-    validate_url,
+    HttpRequestComponent,
 )
 from esphome.components.time import RealTimeClock
 from esphome.components import binary_sensor, sensor, text_sensor
@@ -24,6 +24,7 @@ from esphome.components import binary_sensor, sensor, text_sensor
 CODEOWNERS = ["@kpfleming"]
 
 CONF_BUCKET = "bucket"
+CONF_HTTP_REQUEST_ID = "http_request_id"
 CONF_MEASUREMENTS = "measurements"
 CONF_MEASUREMENT_ID = "measurement_id"
 CONF_ORGANIZATION = "organization"
@@ -45,19 +46,6 @@ SensorField = influxdb_ns.class_("SensorField")
 TextSensorField = influxdb_ns.class_("TextSensorField")
 
 
-def validate_measurement_config(config):
-    if (
-        (CONF_BINARY_SENSORS not in config)
-        and (CONF_SENSORS not in config)
-        and (CONF_TEXT_SENSORS not in config)
-    ):
-        raise cv.Invalid(
-            f"At least one of '{CONF_BINARY_SENSORS}', '{CONF_SENSORS}', or '{CONF_TEXT_SENSORS}' must be specified."
-        )
-
-    return config
-
-
 def valid_identifier(value):
     value = cv.string_strict(value)
 
@@ -69,6 +57,15 @@ def valid_identifier(value):
 
 def escape_identifier(value):
     return "".join(["\\" + c if c in " ,=\\" else c for c in value])
+
+
+def validate_sensor_config(config):
+    if (CONF_ACCURACY_DECIMALS in config) and (config[CONF_FORMAT] != "float"):
+        raise cv.Invalid(
+            f"{CONF_ACCURACY_DECIMALS} cannot be used with the '{config[CONF_FORMAT]}' format"
+        )
+
+    return config
 
 
 MEASUREMENT_SCHEMA = cv.All(
@@ -101,9 +98,13 @@ MEASUREMENT_SCHEMA = cv.All(
                             cv.Optional(CONF_FORMAT, default="float"): cv.enum(
                                 SENSOR_FORMATS
                             ),
+                            cv.Optional(
+                                CONF_ACCURACY_DECIMALS
+                            ): cv.positive_not_null_int,
                             cv.Optional(CONF_RAW_STATE, default=False): cv.boolean,
                         }
                     ),
+                    validate_sensor_config,
                     key=CONF_SENSOR_ID,
                 )
             ),
@@ -124,18 +125,18 @@ MEASUREMENT_SCHEMA = cv.All(
             ),
         }
     ),
-    validate_measurement_config,
+    cv.has_at_least_one_key(CONF_BINARY_SENSORS, CONF_SENSORS, CONF_TEXT_SENSORS),
 )
 
 
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(InfluxDB),
-        cv.Required(CONF_URL): cv.All(cv.string, validate_url),
+        cv.GenerateID(CONF_HTTP_REQUEST_ID): cv.use_id(HttpRequestComponent),
+        cv.Required(CONF_URL): cv.url,
         cv.Required(CONF_ORGANIZATION): cv.string,
         cv.Required(CONF_BUCKET): cv.string,
         cv.Optional(CONF_TOKEN): cv.string,
-        cv.Optional(CONF_USERAGENT, "ESPHome"): cv.string,
         cv.Optional(CONF_TIME_ID): cv.use_id(RealTimeClock),
         cv.Optional(CONF_TAGS): cv.Schema({valid_identifier: cv.string}),
         cv.Required(CONF_MEASUREMENTS): cv.ensure_list(MEASUREMENT_SCHEMA),
@@ -146,6 +147,9 @@ CONFIG_SCHEMA = cv.Schema(
 async def to_code(config):
     db = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(db, config)
+
+    http = await cg.get_variable(config[CONF_HTTP_REQUEST_ID])
+    cg.add(db.set_http_request(http))
 
     url = config[CONF_URL]
     if url[-1] == "/":
@@ -158,9 +162,6 @@ async def to_code(config):
 
     if token := config.get(CONF_TOKEN):
         cg.add(db.set_token(token))
-
-    if useragent := config.get(CONF_USERAGENT):
-        cg.add(db.set_useragent(useragent))
 
     if clock_id := config.get(CONF_TIME_ID):
         clock = await cg.get_variable(clock_id)
@@ -209,6 +210,9 @@ async def to_code(config):
 
                 cg.add(var.set_format(conf[CONF_FORMAT]))
                 cg.add(var.set_raw_state(conf[CONF_RAW_STATE]))
+
+                if accuracy := conf.get(CONF_ACCURACY_DECIMALS):
+                    cg.add(var.set_accuracy_decimals(accuracy))
 
                 if name := conf.get(CONF_NAME):
                     cg.add(var.set_name(escape_identifier(name)))

@@ -2,6 +2,7 @@
 
 #include "esphome/core/defines.h"
 #include "esphome/core/component.h"
+#include "esphome/components/http_request/http_request.h"
 
 #ifdef USE_BINARY_SENSOR
 #include "esphome/components/binary_sensor/binary_sensor.h"
@@ -20,6 +21,8 @@
 #endif
 
 #include <iomanip>
+#include <iostream>
+#include <list>
 #include <sstream>
 #include <vector>
 
@@ -30,9 +33,9 @@ static const char *const TAG = "influxdb_oss_v2";
 
 class InfluxDB : public Component {
 public:
-  void set_url(const char *url) { this->url_ = url; }
+  void set_http_request(http_request::HttpRequestComponent *http) { this->http_request_ = http; };
+  void set_url(const char *url) { this->http_request_->set_url(url); }
   void set_token(const char *token) { this->token_ = token; }
-  void set_useragent(const char *useragent) { this->useragent_ = useragent; }
 #ifdef USE_TIME
   void set_clock(time::RealTimeClock *clock) { this->clock_ = clock; }
 #endif
@@ -42,9 +45,8 @@ public:
   void publish_measurement(std::ostringstream &measurement);
 
 protected:
-  const char *url_;
+  http_request::HttpRequestComponent *http_request_;
   const char *token_{nullptr};
-  const char *useragent_;
 #ifdef USE_TIME
   time::RealTimeClock *clock_{nullptr};
 #endif
@@ -92,6 +94,7 @@ public:
       this->format_ = SensorFieldFormat::UnsignedInteger;
     }
   }
+  void set_accuracy_decimals(int val) { this->accuracy_decimals_ = val; }
   void set_raw_state(bool val) { this->raw_state_ = val; }
 
   bool sensor_has_state() const override { return this->sensor_->has_state(); }
@@ -101,6 +104,7 @@ public:
 protected:
   const sensor::Sensor *sensor_;
   SensorFieldFormat format_;
+  int accuracy_decimals_{-1};
   bool raw_state_{false};
 };
 #endif

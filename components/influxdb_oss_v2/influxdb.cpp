@@ -11,6 +11,7 @@ void BinarySensorField::publish(std::ostringstream &line) const {
 
 #ifdef USE_SENSOR
 void SensorField::publish(std::ostringstream &line) const {
+  const auto default_precision {std::cout.precision()};
   float state;
 
   if (this->raw_state_) {
@@ -21,13 +22,17 @@ void SensorField::publish(std::ostringstream &line) const {
 
   switch (this->format_) {
   case SensorFieldFormat::Float:
-    line << std::scientific << state;
+    if (this->accuracy_decimals_ != -1) {
+      line << std::scientific << std::setprecision(this->accuracy_decimals_) << state << std::defaultfloat << std::setprecision(default_precision);
+    } else {
+      line << std::scientific << state << std::defaultfloat;
+    }
     break;
   case SensorFieldFormat::Integer:
-    line << std::setprecision(0) << state << 'i';
+    line << std::setprecision(0) << state << 'i' << std::setprecision(default_precision);
     break;
   case SensorFieldFormat::UnsignedInteger:
-    line << std::setprecision(0) << std::abs(state) << 'u';
+    line << std::setprecision(0) << std::abs(state) << 'u' << std::setprecision(default_precision);
     break;
   }
 }
@@ -78,7 +83,30 @@ void Measurement::publish() {
 }
 
 void InfluxDB::setup() {
-  // setup http_request object
+  std::list<http_request::Header> headers;
+  http_request::Header header;
+
+  this->http_request_->set_method("POST");
+
+  header.name = "Content-Type";
+  header.value = "text/plain; charset=utf-8";
+  headers.push_back(header);
+
+  header.name = "Content-Encoding";
+  header.value = "identity";
+  headers.push_back(header);
+
+  header.name = "Accept";
+  header.value = "application/json";
+  headers.push_back(header);
+
+  if (this->token_ != nullptr) {
+    header.name = "Authorization";
+    header.value = this->token_;
+    headers.push_back(header);
+  }
+
+  this->http_request_->set_headers(headers);
 }
 
 void InfluxDB::publish_measurement(std::ostringstream &measurement) {
