@@ -40,6 +40,8 @@ public:
   void set_clock(time::RealTimeClock *clock) { this->clock_ = clock; }
 #endif
 
+  float get_setup_priority() const override { return setup_priority::LATE; }
+
   void setup() override;
 
   void publish_measurement(std::ostringstream &measurement);

@@ -157,7 +157,7 @@ async def to_code(config):
     org = config[CONF_ORGANIZATION]
     bucket = config[CONF_BUCKET]
 
-    cg.add(db.set_url(f"{url}/api/v2/write?org={org}&bucket={bucket}"))
+    cg.add(db.set_url(f"{url}/api/v2/write?org={org}&bucket={bucket}&precision=s"))
 
     if token := config.get(CONF_TOKEN):
         cg.add(db.set_token(token))

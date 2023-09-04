@@ -110,9 +110,17 @@ void InfluxDB::setup() {
 }
 
 void InfluxDB::publish_measurement(std::ostringstream &measurement) {
-  // check for clock and add timestamp
-  // send line as POST body
+  if (this->clock_ != nullptr) {
+    auto time = this->clock_->utcnow();
+    measurement << time.strftime("%s");
+  }
+
   ESP_LOGD(TAG, "Publishing: %s", measurement.str().c_str());
+
+  this->http_request_->set_body(measurement.str().c_str());
+  this->http_request_->send({});
+  this->http_request_->close();
+  // check response code
 }
 
 }  // namespace influxdb
