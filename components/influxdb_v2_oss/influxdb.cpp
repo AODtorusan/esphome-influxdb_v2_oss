@@ -79,7 +79,7 @@ void Measurement::publish() {
     sensor_sep = ',';
   }
 
-  this->parent_->publish_measurement(line);
+  this->parent_->publish_measurement(this->url_, line);
 }
 
 void InfluxDB::setup() {
@@ -109,7 +109,7 @@ void InfluxDB::setup() {
   this->http_request_->set_headers(headers);
 }
 
-void InfluxDB::publish_measurement(std::ostringstream &measurement) {
+void InfluxDB::publish_measurement(const std::string &url, std::ostringstream &measurement) {
   if (this->clock_ != nullptr) {
     auto time = this->clock_->now();
     measurement << time.strftime(" %s");
@@ -117,6 +117,7 @@ void InfluxDB::publish_measurement(std::ostringstream &measurement) {
 
   ESP_LOGD(TAG, "Publishing: %s", measurement.str().c_str());
 
+  this->http_request_->set_url(url.c_str());
   this->http_request_->set_body(measurement.str().c_str());
   this->http_request_->send({});
   this->http_request_->close();

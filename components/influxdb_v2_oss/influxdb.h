@@ -34,7 +34,7 @@ static const char *const TAG = "influxdb_v2_oss";
 class InfluxDB : public Component {
 public:
   void set_http_request(http_request::HttpRequestComponent *http) { this->http_request_ = http; };
-  void set_url(const char *url) { this->http_request_->set_url(url); }
+  void set_url(std::string url) { this->url_ = std::move(url); }
   void set_token(const char *token) { this->token_ = std::string("Token ") + token; }
 #ifdef USE_TIME
   void set_clock(time::RealTimeClock *clock) { this->clock_ = clock; }
@@ -44,10 +44,13 @@ public:
 
   void setup() override;
 
-  void publish_measurement(std::ostringstream &measurement);
+  void publish_measurement(const std::string &url, std::ostringstream &measurement);
+
+  const std::string & get_url() { return this->url_; }
 
 protected:
   http_request::HttpRequestComponent *http_request_;
+  std::string url_;
   std::string token_;
 #ifdef USE_TIME
   time::RealTimeClock *clock_{nullptr};
@@ -131,6 +134,7 @@ class Measurement {
 public:
   Measurement(InfluxDB *parent) : parent_(parent) {}
 
+  void set_bucket(const char* bucket) { this->url_ = parent_->get_url() + "&bucket=" + bucket; }
   void set_line_prefix(const char *prefix) { this->line_prefix_ = prefix; }
 
 #ifdef USE_BINARY_SENSOR
@@ -149,6 +153,7 @@ public:
 
 protected:
   InfluxDB *parent_;
+  std::string url_;
   const char *line_prefix_;
   std::vector<const Field *> fields_;
 };

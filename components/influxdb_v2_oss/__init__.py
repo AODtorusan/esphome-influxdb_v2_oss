@@ -71,6 +71,7 @@ MEASUREMENT_SCHEMA = cv.All(
     cv.Schema(
         {
             cv.Required(CONF_ID): cv.declare_id(Measurement),
+            cv.Required(CONF_BUCKET): cv.string,
             cv.Required(CONF_NAME): valid_identifier,
             cv.Optional(CONF_TAGS): cv.Schema({valid_identifier: cv.string}),
             cv.Optional(CONF_BINARY_SENSORS): cv.ensure_list(
@@ -134,7 +135,6 @@ CONFIG_SCHEMA = cv.Schema(
         cv.GenerateID(CONF_HTTP_REQUEST_ID): cv.use_id(HttpRequestComponent),
         cv.Required(CONF_URL): cv.url,
         cv.Required(CONF_ORGANIZATION): cv.string,
-        cv.Required(CONF_BUCKET): cv.string,
         cv.Optional(CONF_TOKEN): cv.string,
         cv.Optional(CONF_TIME_ID): cv.use_id(RealTimeClock),
         cv.Optional(CONF_TAGS): cv.Schema({valid_identifier: cv.string}),
@@ -155,9 +155,8 @@ async def to_code(config):
         url = url[0:-1]
 
     org = config[CONF_ORGANIZATION]
-    bucket = config[CONF_BUCKET]
 
-    cg.add(db.set_url(f"{url}/api/v2/write?org={org}&bucket={bucket}&precision=s"))
+    cg.add(db.set_url(f"{url}/api/v2/write?org={org}&precision=s"))
 
     if token := config.get(CONF_TOKEN):
         cg.add(db.set_token(token))
@@ -174,6 +173,9 @@ async def to_code(config):
 
     for measurement in config.get(CONF_MEASUREMENTS):
         meas = cg.new_Pvariable(measurement[CONF_ID], db)
+
+        bucket = measurement[CONF_BUCKET]
+        cg.add(meas.set_bucket(bucket))
 
         tag_string = ""
         if tags := measurement.get(CONF_TAGS):
