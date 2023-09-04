@@ -237,7 +237,7 @@ async def to_code(config):
 CONF_INFLUXDB_PUBLISH = "influxdb.publish"
 INFLUXDB_PUBLISH_ACTION_SCHEMA = automation.maybe_simple_id(
     {
-        cv.GenerateID(CONF_MEASUREMENT_ID): cv.use_id(Measurement),
+        cv.GenerateID(): cv.use_id(Measurement),
     }
 )
 
@@ -246,7 +246,7 @@ INFLUXDB_PUBLISH_ACTION_SCHEMA = automation.maybe_simple_id(
     CONF_INFLUXDB_PUBLISH, automation.LambdaAction, INFLUXDB_PUBLISH_ACTION_SCHEMA
 )
 async def influxdb_publish_action_to_code(config, action_id, template_arg, args):
-    meas = await cg.get_variable(config[CONF_MEASUREMENT_ID])
+    meas = await cg.get_variable(config[CONF_ID])
     text = str(cg.statement(meas.publish()))
     lambda_ = await cg.process_lambda(Lambda(text), args, return_type=cg.void)
     return cg.new_Pvariable(action_id, template_arg, lambda_)
