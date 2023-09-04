@@ -199,7 +199,7 @@ async def to_code(config):
                 cg.add(var.set_sensor(sens))
 
                 if name := conf.get(CONF_NAME):
-                    cg.add(var.set_name(escape_identifier(name)))
+                    cg.add(var.set_field_name(escape_identifier(name)))
 
                 cg.add(meas.add_binary_sensor_field(var))
 
@@ -216,7 +216,7 @@ async def to_code(config):
                     cg.add(var.set_accuracy_decimals(accuracy))
 
                 if name := conf.get(CONF_NAME):
-                    cg.add(var.set_name(escape_identifier(name)))
+                    cg.add(var.set_field_name(escape_identifier(name)))
 
                 cg.add(meas.add_sensor_field(var))
 
@@ -229,7 +229,7 @@ async def to_code(config):
                 cg.add(var.set_raw_state(conf[CONF_RAW_STATE]))
 
                 if name := conf.get(CONF_NAME):
-                    cg.add(var.set_name(escape_identifier(name)))
+                    cg.add(var.set_field_name(escape_identifier(name)))
 
                 cg.add(meas.add_text_sensor_field(var))
 
