@@ -100,9 +100,9 @@ void InfluxDB::setup() {
   header.value = "application/json";
   headers.push_back(header);
 
-  if (this->token_ != nullptr) {
+  if (!this->token_.empty()) {
     header.name = "Authorization";
-    header.value = this->token_;
+    header.value = this->token_.c_str();
     headers.push_back(header);
   }
 
@@ -112,7 +112,7 @@ void InfluxDB::setup() {
 void InfluxDB::publish_measurement(std::ostringstream &measurement) {
   if (this->clock_ != nullptr) {
     auto time = this->clock_->utcnow();
-    measurement << time.strftime("%s");
+    measurement << time.strftime(" %s");
   }
 
   ESP_LOGD(TAG, "Publishing: %s", measurement.str().c_str());

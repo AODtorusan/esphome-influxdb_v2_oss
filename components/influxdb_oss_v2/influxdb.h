@@ -35,7 +35,7 @@ class InfluxDB : public Component {
 public:
   void set_http_request(http_request::HttpRequestComponent *http) { this->http_request_ = http; };
   void set_url(const char *url) { this->http_request_->set_url(url); }
-  void set_token(const char *token) { this->token_ = token; }
+  void set_token(const char *token) { this->token_ = std::string("Token ") + token; }
 #ifdef USE_TIME
   void set_clock(time::RealTimeClock *clock) { this->clock_ = clock; }
 #endif
@@ -48,7 +48,7 @@ public:
 
 protected:
   http_request::HttpRequestComponent *http_request_;
-  const char *token_{nullptr};
+  std::string token_;
 #ifdef USE_TIME
   time::RealTimeClock *clock_{nullptr};
 #endif
