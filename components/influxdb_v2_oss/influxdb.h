@@ -29,7 +29,7 @@
 namespace esphome {
 namespace influxdb {
 
-static const char *const TAG = "influxdb_oss_v2";
+static const char *const TAG = "influxdb_v2_oss";
 
 class InfluxDB : public Component {
 public:
