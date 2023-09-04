@@ -111,7 +111,7 @@ void InfluxDB::setup() {
 
 void InfluxDB::publish_measurement(std::ostringstream &measurement) {
   if (this->clock_ != nullptr) {
-    auto time = this->clock_->utcnow();
+    auto time = this->clock_->now();
     measurement << time.strftime(" %s");
   }
 
