@@ -1,5 +1,4 @@
 from esphome import automation
-from esphome.automation import LambdaAction
 from esphome.core import Lambda
 import esphome.codegen as cg
 import esphome.config_validation as cv
@@ -234,16 +233,15 @@ async def to_code(config):
 
 
 CONF_INFLUXDB_PUBLISH = "influxdb.publish"
-INFLUXDB_PUBLISH_ACTION_SCHEMA = cv.maybe_simple_value(
+INFLUXDB_PUBLISH_ACTION_SCHEMA = automation.maybe_simple_id(
     {
         cv.GenerateID(CONF_MEASUREMENT_ID): cv.use_id(Measurement),
-    },
-    key=CONF_MEASUREMENT_ID,
+    }
 )
 
 
 @automation.register_action(
-    CONF_INFLUXDB_PUBLISH, LambdaAction, INFLUXDB_PUBLISH_ACTION_SCHEMA
+    CONF_INFLUXDB_PUBLISH, automation.LambdaAction, INFLUXDB_PUBLISH_ACTION_SCHEMA
 )
 async def influxdb_publish_action_to_code(config, action_id, template_arg, args):
     meas = await cg.get_variable(config[CONF_MEASUREMENT_ID])
