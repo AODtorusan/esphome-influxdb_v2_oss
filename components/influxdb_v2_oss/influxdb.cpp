@@ -104,7 +104,7 @@ void InfluxDB::setup() {
 void InfluxDB::publish_measurement(const std::string &url, std::string &measurement) {
   if (this->clock_ != nullptr) {
     auto time = this->clock_->now();
-    measurement += time.strftime(" %s");
+    measurement += str_sprintf(" %ld", time.timestamp);
   }
 
   ESP_LOGD(TAG, "Publishing: %s", measurement.c_str());
