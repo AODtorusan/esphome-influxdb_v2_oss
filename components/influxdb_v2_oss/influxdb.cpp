@@ -106,8 +106,8 @@ void InfluxDB::publish_measurement(const std::string &url, std::string &measurem
   }
 
   this->http_request_->set_headers(headers);
-  this->http_request_->set_url(url.c_str());
-  this->http_request_->set_body(measurement.c_str());
+  this->http_request_->set_url(url);
+  this->http_request_->set_body(measurement);
 
 #ifdef USE_ESP_IDF
   this->http_request_->send();
@@ -115,6 +115,10 @@ void InfluxDB::publish_measurement(const std::string &url, std::string &measurem
   this->http_request_->send({});
   this->http_request_->close();
 #endif
+
+  this->http_request_->set_body("");
+  this->http_request_->set_url("");
+  this->http_request_->set_headers({});
 
   // check response code
 }
