@@ -74,7 +74,14 @@ void Measurement::publish() {
   this->parent_->publish_measurement(this->url_, line);
 }
 
-void InfluxDB::setup() {
+void InfluxDB::publish_measurement(const std::string &url, std::string &measurement) {
+  if (this->clock_ != nullptr) {
+    auto time = this->clock_->now();
+    measurement += str_sprintf(" %jd", (intmax_t) time.timestamp);
+  }
+
+  ESP_LOGD(TAG, "Publishing: %s", measurement.c_str());
+
   std::list<http_request::Header> headers;
   http_request::Header header;
 
@@ -99,16 +106,6 @@ void InfluxDB::setup() {
   }
 
   this->http_request_->set_headers(headers);
-}
-
-void InfluxDB::publish_measurement(const std::string &url, std::string &measurement) {
-  if (this->clock_ != nullptr) {
-    auto time = this->clock_->now();
-    measurement += str_sprintf(" %ld", time.timestamp);
-  }
-
-  ESP_LOGD(TAG, "Publishing: %s", measurement.c_str());
-
   this->http_request_->set_url(url.c_str());
   this->http_request_->set_body(measurement.c_str());
 

@@ -39,8 +39,6 @@ public:
 
   float get_setup_priority() const override { return setup_priority::LATE; }
 
-  void setup() override;
-
   void publish_measurement(const std::string &url, std::string &measurement);
 
   const std::string &get_url() { return this->url_; }
