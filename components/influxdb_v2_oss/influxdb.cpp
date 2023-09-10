@@ -110,17 +110,44 @@ void InfluxDB::publish_measurement(const std::string &url, std::string &measurem
   this->http_request_->set_body(measurement);
 
 #ifdef USE_ESP_IDF
-  this->http_request_->send();
+  this->http_request_->set_capture_response(false);
+  auto response = this->http_request_->send();
 #else
   this->http_request_->send({});
+#endif
+
+#ifdef USE_TIME
+  if (this->backlog_max_depth_ != 0) {
+    if (this->http_request_->status_has_warning()) {
+      if (this->backlog_.size() == this->backlog_max_depth_) {
+	ESP_LOGW(TAG, "Backlog is full, dropping oldest entry.");
+	this->backlog_.pop_front();
+      }
+      this->backlog_.emplace_back(url, measurement);
+    } else {
+      if (!this->backlog_.empty()) {
+	for (uint8_t i = 0; i < this->backlog_drain_batch_; i++) {
+	  const auto &m = this->backlog_.front();
+	  this->http_request_->set_url(m.url);
+	  this->http_request_->set_body(m.measurement);
+#ifdef USE_ESP_IDF
+	  auto response = this->http_request_->send();
+#else
+	  this->http_request_->send({});
+#endif
+	  this->backlog_.pop_front();
+	}
+      }
+    }
+  }
+#endif
+
+#ifndef USE_ESP_IDF
   this->http_request_->close();
 #endif
 
-  this->http_request_->set_body("");
-  this->http_request_->set_url("");
   this->http_request_->set_headers({});
-
-  // check response code
+  this->http_request_->set_body("");
 }
 
 }  // namespace influxdb

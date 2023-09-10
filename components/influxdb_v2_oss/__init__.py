@@ -22,6 +22,8 @@ from esphome.components import binary_sensor, sensor, text_sensor
 
 CODEOWNERS = ["@kpfleming"]
 
+CONF_BACKLOG_DRAIN_BATCH = "backlog_drain_batch"
+CONF_BACKLOG_MAX_DEPTH = "backlog_max_depth"
 CONF_BUCKET = "bucket"
 CONF_HTTP_REQUEST_ID = "http_request_id"
 CONF_MEASUREMENTS = "measurements"
@@ -129,18 +131,35 @@ MEASUREMENT_SCHEMA = cv.All(
 )
 
 
-CONFIG_SCHEMA = cv.Schema(
-    {
-        cv.GenerateID(): cv.declare_id(InfluxDB),
-        cv.GenerateID(CONF_HTTP_REQUEST_ID): cv.use_id(HttpRequestComponent),
-        cv.Required(CONF_URL): cv.url,
-        cv.Required(CONF_ORGANIZATION): cv.string,
-        cv.Optional(CONF_TOKEN): cv.string,
-        cv.Optional(CONF_TIME_ID): cv.use_id(RealTimeClock),
-        cv.Optional(CONF_TAGS): cv.Schema({valid_identifier: cv.string}),
-        cv.Required(CONF_MEASUREMENTS): cv.ensure_list(MEASUREMENT_SCHEMA),
-    }
-).extend(cv.COMPONENT_SCHEMA)
+def validate_config(config):
+    if (CONF_BACKLOG_MAX_DEPTH in config) and (CONF_TIME_ID not in config):
+        raise cv.Invalid(f"{CONF_BACKLOG_MAX_DEPTH} requires a 'time' component.")
+
+    if (CONF_BACKLOG_DRAIN_BATCH in config) and (CONF_BACKLOG_MAX_DEPTH not in config):
+        raise cv.Invalid(
+            f"{CONF_BACKLOG_DRAIN_BATCH} requires {CONF_BACKLOG_MAX_DEPTH} to be set."
+        )
+
+    return config
+
+
+CONFIG_SCHEMA = cv.All(
+    cv.Schema(
+        {
+            cv.GenerateID(): cv.declare_id(InfluxDB),
+            cv.GenerateID(CONF_HTTP_REQUEST_ID): cv.use_id(HttpRequestComponent),
+            cv.Required(CONF_URL): cv.url,
+            cv.Required(CONF_ORGANIZATION): cv.string,
+            cv.Optional(CONF_TOKEN): cv.string,
+            cv.Optional(CONF_TIME_ID): cv.use_id(RealTimeClock),
+            cv.Optional(CONF_TAGS): cv.Schema({valid_identifier: cv.string}),
+            cv.Optional(CONF_BACKLOG_MAX_DEPTH): cv.int_range(min=1, max=200),
+            cv.Optional(CONF_BACKLOG_DRAIN_BATCH): cv.int_range(min=1, max=20),
+            cv.Required(CONF_MEASUREMENTS): cv.ensure_list(MEASUREMENT_SCHEMA),
+        }
+    ).extend(cv.COMPONENT_SCHEMA),
+    validate_config,
+)
 
 
 async def to_code(config):
@@ -164,6 +183,12 @@ async def to_code(config):
     if clock_id := config.get(CONF_TIME_ID):
         clock = await cg.get_variable(clock_id)
         cg.add(db.set_clock(clock))
+
+        if backlog_max_depth := config.get(CONF_BACKLOG_MAX_DEPTH):
+            cg.add(db.set_backlog_max_depth(backlog_max_depth))
+
+            if backlog_drain_batch := config.get(CONF_BACKLOG_DRAIN_BATCH):
+                cg.add(db.set_backlog_drain_batch(backlog_drain_batch))
 
     parent_tag_string = ""
     if tags := config.get(CONF_TAGS):

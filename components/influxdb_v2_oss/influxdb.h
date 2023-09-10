@@ -28,6 +28,14 @@ namespace influxdb {
 
 static const char *const TAG = "influxdb_v2_oss";
 
+class BacklogEntry {
+public:
+  BacklogEntry(const std::string &url, const std::string &measurement) : url(url), measurement(measurement) {}
+
+  std::string url;
+  std::string measurement;
+};
+
 class InfluxDB : public Component {
 public:
   void set_http_request(http_request::HttpRequestComponent *http) { this->http_request_ = http; };
@@ -35,6 +43,8 @@ public:
   void set_token(std::string token) { this->token_ = std::string("Token ") + token; }
 #ifdef USE_TIME
   void set_clock(time::RealTimeClock *clock) { this->clock_ = clock; }
+  void set_backlog_max_depth(uint8_t val) { this->backlog_max_depth_ = val; }
+  void set_backlog_drain_batch(uint8_t val) { this->backlog_drain_batch_ = val; }
 #endif
 
   float get_setup_priority() const override { return setup_priority::LATE; }
@@ -49,6 +59,9 @@ protected:
   std::string token_;
 #ifdef USE_TIME
   time::RealTimeClock *clock_{nullptr};
+  std::list<BacklogEntry> backlog_;
+  uint8_t backlog_max_depth_{0};
+  uint8_t backlog_drain_batch_{1};
 #endif
 };
 
