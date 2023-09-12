@@ -69,65 +69,76 @@ def validate_sensor_config(config):
     return config
 
 
-MEASUREMENT_SCHEMA = cv.All(
-    cv.Schema(
-        {
-            cv.Required(CONF_ID): cv.declare_id(Measurement),
-            cv.Required(CONF_BUCKET): cv.string,
-            cv.Required(CONF_NAME): valid_identifier,
-            cv.Optional(CONF_TAGS): cv.Schema({valid_identifier: cv.string}),
-            cv.Optional(CONF_BINARY_SENSORS): cv.ensure_list(
-                cv.maybe_simple_value(
-                    cv.Schema(
-                        {
-                            cv.GenerateID(): cv.declare_id(BinarySensorField),
-                            cv.Required(CONF_SENSOR_ID): cv.use_id(
-                                binary_sensor.BinarySensor
+MEASUREMENTS_SCHEMA = cv.Schema(
+    {
+        cv.declare_id(Measurement): cv.All(
+            cv.Schema(
+                {
+                    cv.Required(CONF_BUCKET): cv.string,
+                    cv.Required(CONF_NAME): valid_identifier,
+                    cv.Optional(CONF_TAGS): cv.Schema({valid_identifier: cv.string}),
+                    cv.Optional(CONF_BINARY_SENSORS): cv.ensure_list(
+                        cv.maybe_simple_value(
+                            cv.Schema(
+                                {
+                                    cv.GenerateID(): cv.declare_id(BinarySensorField),
+                                    cv.Required(CONF_SENSOR_ID): cv.use_id(
+                                        binary_sensor.BinarySensor
+                                    ),
+                                    cv.Optional(CONF_NAME): valid_identifier,
+                                }
                             ),
-                            cv.Optional(CONF_NAME): valid_identifier,
-                        }
+                            key=CONF_SENSOR_ID,
+                        )
                     ),
-                    key=CONF_SENSOR_ID,
-                )
-            ),
-            cv.Optional(CONF_SENSORS): cv.ensure_list(
-                cv.maybe_simple_value(
-                    cv.Schema(
-                        {
-                            cv.GenerateID(): cv.declare_id(SensorField),
-                            cv.Required(CONF_SENSOR_ID): cv.use_id(sensor.Sensor),
-                            cv.Optional(CONF_NAME): valid_identifier,
-                            cv.Optional(CONF_FORMAT, default="float"): cv.enum(
-                                SENSOR_FORMATS
+                    cv.Optional(CONF_SENSORS): cv.ensure_list(
+                        cv.maybe_simple_value(
+                            cv.Schema(
+                                {
+                                    cv.GenerateID(): cv.declare_id(SensorField),
+                                    cv.Required(CONF_SENSOR_ID): cv.use_id(
+                                        sensor.Sensor
+                                    ),
+                                    cv.Optional(CONF_NAME): valid_identifier,
+                                    cv.Optional(CONF_FORMAT, default="float"): cv.enum(
+                                        SENSOR_FORMATS
+                                    ),
+                                    cv.Optional(
+                                        CONF_ACCURACY_DECIMALS,
+                                    ): cv.positive_not_null_int,
+                                    cv.Optional(
+                                        CONF_RAW_STATE, default=False
+                                    ): cv.boolean,
+                                }
                             ),
-                            cv.Optional(
-                                CONF_ACCURACY_DECIMALS,
-                            ): cv.positive_not_null_int,
-                            cv.Optional(CONF_RAW_STATE, default=False): cv.boolean,
-                        }
+                            validate_sensor_config,
+                            key=CONF_SENSOR_ID,
+                        )
                     ),
-                    validate_sensor_config,
-                    key=CONF_SENSOR_ID,
-                )
-            ),
-            cv.Optional(CONF_TEXT_SENSORS): cv.ensure_list(
-                cv.maybe_simple_value(
-                    cv.Schema(
-                        {
-                            cv.GenerateID(): cv.declare_id(TextSensorField),
-                            cv.Required(CONF_SENSOR_ID): cv.use_id(
-                                text_sensor.TextSensor
+                    cv.Optional(CONF_TEXT_SENSORS): cv.ensure_list(
+                        cv.maybe_simple_value(
+                            cv.Schema(
+                                {
+                                    cv.GenerateID(): cv.declare_id(TextSensorField),
+                                    cv.Required(CONF_SENSOR_ID): cv.use_id(
+                                        text_sensor.TextSensor
+                                    ),
+                                    cv.Optional(CONF_NAME): valid_identifier,
+                                    cv.Optional(
+                                        CONF_RAW_STATE, default=False
+                                    ): cv.boolean,
+                                }
                             ),
-                            cv.Optional(CONF_NAME): valid_identifier,
-                            cv.Optional(CONF_RAW_STATE, default=False): cv.boolean,
-                        }
+                            key=CONF_SENSOR_ID,
+                        )
                     ),
-                    key=CONF_SENSOR_ID,
-                )
+                }
             ),
-        }
-    ),
-    cv.has_at_least_one_key(CONF_BINARY_SENSORS, CONF_SENSORS, CONF_TEXT_SENSORS),
+            cv.has_at_least_one_key(
+                CONF_BINARY_SENSORS, CONF_SENSORS, CONF_TEXT_SENSORS
+            ),
+        ),
+    }
 )
 
 
@@ -155,7 +166,7 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_TAGS): cv.Schema({valid_identifier: cv.string}),
             cv.Optional(CONF_BACKLOG_MAX_DEPTH): cv.int_range(min=1, max=200),
             cv.Optional(CONF_BACKLOG_DRAIN_BATCH): cv.int_range(min=1, max=20),
-            cv.Required(CONF_MEASUREMENTS): cv.ensure_list(MEASUREMENT_SCHEMA),
+            cv.Required(CONF_MEASUREMENTS): MEASUREMENTS_SCHEMA,
         }
     ).extend(cv.COMPONENT_SCHEMA),
     validate_config,
@@ -196,8 +207,8 @@ async def to_code(config):
             [f",{escape_identifier(k)}={escape_identifier(v)}" for k, v in tags.items()]
         )
 
-    for measurement in config.get(CONF_MEASUREMENTS):
-        meas = cg.new_Pvariable(measurement[CONF_ID], db)
+    for measurement_id, measurement in config.get(CONF_MEASUREMENTS).items():
+        meas = cg.new_Pvariable(measurement_id, db)
 
         bucket = measurement[CONF_BUCKET]
         cg.add(meas.set_bucket(bucket))
