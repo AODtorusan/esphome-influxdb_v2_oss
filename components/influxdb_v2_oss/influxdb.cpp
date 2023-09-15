@@ -47,7 +47,7 @@ void TextSensorField::publish(std::string &line) const {
 }
 #endif
 
-void Measurement::publish() {
+std::string Measurement::publish(const std::string &timestamp) const {
   std::string line{this->line_prefix_};
   char sensor_sep = ' ';
 
@@ -71,16 +71,57 @@ void Measurement::publish() {
     sensor_sep = ',';
   }
 
-  this->parent_->publish_measurement(this->url_, line);
+  line += timestamp + '\n';
+
+  return line;
 }
 
-void InfluxDB::publish_measurement(const std::string &url, std::string &measurement) {
-  if (this->clock_ != nullptr) {
-    auto time = this->clock_->now();
-    measurement += str_sprintf(" %jd", (intmax_t) time.timestamp);
+void InfluxDB::publish_action(const Measurement *measurement) {
+  std::string timestamp;
+  auto db = measurement->get_parent();
+
+#ifdef USE_TIME
+  if (db->clock_ != nullptr) {
+    auto time = db->clock_->now();
+    timestamp = str_sprintf(" %jd", (intmax_t) time.timestamp);
+  }
+#endif
+
+  db->send_data(measurement->get_url(), measurement->publish(timestamp));
+}
+
+void InfluxDB::publish_batch_action(std::list<const Measurement *> measurements) {
+  std::string timestamp;
+  auto db = measurements.front()->get_parent();
+  auto url = measurements.front()->get_url();
+  std::string data;
+
+#ifdef USE_TIME
+  if (db->clock_ != nullptr) {
+    auto time = db->clock_->now();
+    timestamp = str_sprintf(" %jd", (intmax_t) time.timestamp);
+  }
+#endif
+
+  for (auto measurement : measurements) {
+    if (measurement->get_parent() != db) {
+      ESP_LOGE(TAG, "Batch cannot include measurements for multiple databases.");
+      continue;
+    }
+
+    if (measurement->get_url() != url) {
+      ESP_LOGE(TAG, "Batch cannot include measurements for multiple buckets.");
+      continue;
+    }
+
+    data += measurement->publish(timestamp);
   }
 
-  ESP_LOGD(TAG, "Publishing: %s", measurement.c_str());
+  db->send_data(url, data);
+}
+
+void InfluxDB::send_data(const std::string &url, const std::string &data) {
+  ESP_LOGD(TAG, "Publishing: %s", data.c_str());
 
   std::list<http_request::Header> headers;
   http_request::Header header;
@@ -107,7 +148,7 @@ void InfluxDB::publish_measurement(const std::string &url, std::string &measurem
 
   this->http_request_->set_headers(headers);
   this->http_request_->set_url(url);
-  this->http_request_->set_body(measurement);
+  this->http_request_->set_body(data);
 
 #ifdef USE_ESP_IDF
   this->http_request_->set_capture_response(false);
@@ -123,13 +164,13 @@ void InfluxDB::publish_measurement(const std::string &url, std::string &measurem
 	ESP_LOGW(TAG, "Backlog is full, dropping oldest entry.");
 	this->backlog_.pop_front();
       }
-      this->backlog_.emplace_back(url, measurement);
+      this->backlog_.emplace_back(url, data);
     } else {
       if (!this->backlog_.empty()) {
 	for (uint8_t i = 0; i < this->backlog_drain_batch_; i++) {
 	  const auto &m = this->backlog_.front();
 	  this->http_request_->set_url(m.url);
-	  this->http_request_->set_body(m.measurement);
+	  this->http_request_->set_body(m.data);
 #ifdef USE_ESP_IDF
 	  auto response = this->http_request_->send();
 #else

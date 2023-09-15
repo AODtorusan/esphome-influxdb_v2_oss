@@ -41,6 +41,7 @@ SENSOR_FORMATS = {
 
 influxdb_ns = cg.esphome_ns.namespace("influxdb")
 InfluxDB = influxdb_ns.class_("InfluxDB", cg.Component)
+InfluxDBStatics = influxdb_ns.namespace("InfluxDB")
 Measurement = influxdb_ns.class_("Measurement")
 BinarySensorField = influxdb_ns.class_("BinarySensorField")
 SensorField = influxdb_ns.class_("SensorField")
@@ -283,6 +284,22 @@ INFLUXDB_PUBLISH_ACTION_SCHEMA = automation.maybe_simple_id(
 )
 async def influxdb_publish_action_to_code(config, action_id, template_arg, args):
     meas = await cg.get_variable(config[CONF_ID])
-    text = str(cg.statement(meas.publish()))
+    text = str(cg.statement(InfluxDBStatics.publish_action(meas)))
+    lambda_ = await cg.process_lambda(Lambda(text), args, return_type=cg.void)
+    return cg.new_Pvariable(action_id, template_arg, lambda_)
+
+
+CONF_INFLUXDB_PUBLISH_BATCH = "influxdb.publish_batch"
+INFLUXDB_PUBLISH_BATCH_ACTION_SCHEMA = cv.ensure_list(cv.use_id(Measurement))
+
+
+@automation.register_action(
+    CONF_INFLUXDB_PUBLISH_BATCH,
+    automation.LambdaAction,
+    INFLUXDB_PUBLISH_BATCH_ACTION_SCHEMA,
+)
+async def influxdb_publish_batch_action_to_code(config, action_id, template_arg, args):
+    meas = [await cg.get_variable(m) for m in config]
+    text = str(cg.statement(InfluxDBStatics.publish_batch_action(meas)))
     lambda_ = await cg.process_lambda(Lambda(text), args, return_type=cg.void)
     return cg.new_Pvariable(action_id, template_arg, lambda_)

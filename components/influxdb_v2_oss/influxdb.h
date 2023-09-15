@@ -30,11 +30,13 @@ static const char *const TAG = "influxdb_v2_oss";
 
 class BacklogEntry {
 public:
-  BacklogEntry(const std::string &url, const std::string &measurement) : url(url), measurement(measurement) {}
+  BacklogEntry(const std::string &url, const std::string &data) : url(url), data(data) {}
 
   std::string url;
-  std::string measurement;
+  std::string data;
 };
+
+class Measurement;
 
 class InfluxDB : public Component {
 public:
@@ -49,11 +51,14 @@ public:
 
   float get_setup_priority() const override { return setup_priority::LATE; }
 
-  void publish_measurement(const std::string &url, std::string &measurement);
+  static void publish_action(const Measurement *measurement);
+  static void publish_batch_action(std::list<const Measurement *> measurements);
 
   const std::string &get_url() { return this->url_; }
 
 protected:
+  void send_data(const std::string &url, const std::string &data);
+
   http_request::HttpRequestComponent *http_request_;
   std::string url_;
   std::string token_;
@@ -145,6 +150,9 @@ public:
   void set_bucket(std::string bucket) { this->url_ = parent_->get_url() + "&bucket=" + bucket; }
   void set_line_prefix(std::string prefix) { this->line_prefix_ = std::move(prefix); }
 
+  InfluxDB *get_parent() const { return this->parent_; }
+  const std::string &get_url() const { return this->url_; }
+
 #ifdef USE_BINARY_SENSOR
   void add_binary_sensor_field(const BinarySensorField *sensor) { this->fields_.push_back(sensor); }
 #endif
@@ -157,7 +165,7 @@ public:
   void add_text_sensor_field(const TextSensorField *sensor) { this->fields_.push_back(sensor); }
 #endif
 
-  void publish();
+  std::string publish(const std::string &timestamp) const;
 
 protected:
   InfluxDB *parent_;
