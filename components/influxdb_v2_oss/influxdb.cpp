@@ -164,10 +164,14 @@ void InfluxDB::send_data(const std::string &url, const std::string &data) {
 	ESP_LOGW(TAG, "Backlog is full, dropping oldest entry.");
 	this->backlog_.pop_front();
       }
+      ESP_LOGD(TAG, "HTTP request failed, adding to backlog");
       this->backlog_.emplace_back(url, data);
+      ESP_LOGD(TAG, "Backlog depth: %zd", this->backlog_.size());
     } else {
       if (!this->backlog_.empty()) {
-	for (uint8_t i = 0; i < this->backlog_drain_batch_; i++) {
+	ESP_LOGD(TAG, "HTTP request succeeded, draining items from backlog");
+	uint8_t item_count;
+	for (item_count = 1; !this->backlog_.empty() && (item_count <= this->backlog_drain_batch_); item_count++) {
 	  const auto &m = this->backlog_.front();
 	  this->http_request_->set_url(m.url);
 	  this->http_request_->set_body(m.data);
@@ -178,6 +182,7 @@ void InfluxDB::send_data(const std::string &url, const std::string &data) {
 #endif
 	  this->backlog_.pop_front();
 	}
+	ESP_LOGD(TAG, "Drained %d items from backlog", item_count - 1);
       }
     }
   }
