@@ -170,8 +170,8 @@ void InfluxDB::send_data(const std::string &url, const std::string &data) {
     } else {
       if (!this->backlog_.empty()) {
 	ESP_LOGD(TAG, "HTTP request succeeded, draining items from backlog");
-	uint8_t item_count;
-	for (item_count = 1; !this->backlog_.empty() && (item_count <= this->backlog_drain_batch_); item_count++) {
+	uint8_t item_count = 0;
+	do {
 	  const auto &m = this->backlog_.front();
 	  this->http_request_->set_url(m.url);
 	  this->http_request_->set_body(m.data);
@@ -181,7 +181,8 @@ void InfluxDB::send_data(const std::string &url, const std::string &data) {
 	  this->http_request_->send({});
 #endif
 	  this->backlog_.pop_front();
-	}
+	  item_count++;
+	} while (!this->backlog_.empty() && (item_count < this->backlog_drain_batch_));
 	ESP_LOGD(TAG, "Drained %d items from backlog", item_count - 1);
       }
     }
