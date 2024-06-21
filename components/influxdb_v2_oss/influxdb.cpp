@@ -143,9 +143,15 @@ void InfluxDB::publish_batch_action(std::list<const Measurement *> measurements)
 }
 
 void InfluxDB::send_data(const std::string &url, std::string &&data) {
+  uint8_t buf[1024];
+
   ESP_LOGD(TAG, "Publishing: %s", data.c_str());
 
   auto response = this->http_request_->post(url, data, this->headers_);
+
+  if (response != nullptr && !this->http_request_->status_has_error()) {
+    while (response->read(buf, sizeof(buf)) != 0) {}
+  }
 
 #ifdef USE_TIME
   if (this->backlog_max_depth_ != 0) {
@@ -163,10 +169,17 @@ void InfluxDB::send_data(const std::string &url, std::string &&data) {
 	uint8_t item_count = 0;
 	do {
 	  const auto &m = this->backlog_.front();
+
 	  auto response = this->http_request_->post(m.url, m.data, this->headers_);
+	  if (response == nullptr || this->http_request_->status_has_error()) {
+	    break;
+	  }
+
+	  while (response->read(buf, sizeof(buf)) != 0) {}
 	  response->end();
 	  this->backlog_.pop_front();
 	  item_count++;
+
 	} while (!this->backlog_.empty() && (item_count < this->backlog_drain_batch_));
 	ESP_LOGD(TAG, "Drained %d items from backlog", item_count - 1);
       }
@@ -174,7 +187,9 @@ void InfluxDB::send_data(const std::string &url, std::string &&data) {
   }
 #endif
 
-  response->end();
+  if (response != nullptr) {
+    response->end();
+  }
 }
 
 }  // namespace influxdb
