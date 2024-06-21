@@ -30,9 +30,9 @@ static const char *const TAG = "influxdb_v2_oss";
 
 class BacklogEntry {
 public:
-  BacklogEntry(const std::string &url, const std::string &data) : url(url), data(data) {}
+  BacklogEntry(const std::string &url, std::string &&data) : url(url), data(std::move(data)) {}
 
-  std::string url;
+  const std::string &url;
   std::string data;
 };
 
@@ -40,6 +40,7 @@ class Measurement;
 
 class InfluxDB : public Component {
 public:
+  void setup();
   void set_http_request(http_request::HttpRequestComponent *http) { this->http_request_ = http; };
   void set_url(std::string url) { this->url_ = std::move(url); }
   void set_token(std::string token) { this->token_ = std::string("Token ") + token; }
@@ -57,11 +58,12 @@ public:
   const std::string &get_url() { return this->url_; }
 
 protected:
-  void send_data(const std::string &url, const std::string &data);
+  void send_data(const std::string &url, std::string &&data);
 
   http_request::HttpRequestComponent *http_request_;
   std::string url_;
   std::string token_;
+  std::list<http_request::Header> headers_;
 #ifdef USE_TIME
   time::RealTimeClock *clock_{nullptr};
   std::list<BacklogEntry> backlog_;

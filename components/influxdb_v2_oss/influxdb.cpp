@@ -76,6 +76,28 @@ std::string Measurement::publish(const std::string &timestamp) const {
   return line;
 }
 
+void InfluxDB::setup() {
+  http_request::Header header;
+
+  header.name = "Content-Type";
+  header.value = "text/plain; charset=utf-8";
+  this->headers_.push_back(header);
+
+  header.name = "Content-Encoding";
+  header.value = "identity";
+  this->headers_.push_back(header);
+
+  header.name = "Accept";
+  header.value = "application/json";
+  this->headers_.push_back(header);
+
+  if (!this->token_.empty()) {
+    header.name = "Authorization";
+    header.value = this->token_.c_str();
+    this->headers_.push_back(header);
+  }
+}
+
 void InfluxDB::publish_action(const Measurement *measurement) {
   std::string timestamp;
   auto db = measurement->get_parent();
@@ -117,55 +139,23 @@ void InfluxDB::publish_batch_action(std::list<const Measurement *> measurements)
     data += measurement->publish(timestamp);
   }
 
-  db->send_data(url, data);
+  db->send_data(url, std::move(data));
 }
 
-void InfluxDB::send_data(const std::string &url, const std::string &data) {
+void InfluxDB::send_data(const std::string &url, std::string &&data) {
   ESP_LOGD(TAG, "Publishing: %s", data.c_str());
 
-  std::list<http_request::Header> headers;
-  http_request::Header header;
-
-  this->http_request_->set_method("POST");
-
-  header.name = "Content-Type";
-  header.value = "text/plain; charset=utf-8";
-  headers.push_back(header);
-
-  header.name = "Content-Encoding";
-  header.value = "identity";
-  headers.push_back(header);
-
-  header.name = "Accept";
-  header.value = "application/json";
-  headers.push_back(header);
-
-  if (!this->token_.empty()) {
-    header.name = "Authorization";
-    header.value = this->token_.c_str();
-    headers.push_back(header);
-  }
-
-  this->http_request_->set_headers(headers);
-  this->http_request_->set_url(url);
-  this->http_request_->set_body(data);
-
-#ifdef USE_ESP_IDF
-  this->http_request_->set_capture_response(false);
-  auto response = this->http_request_->send();
-#else
-  this->http_request_->send({});
-#endif
+  auto response = this->http_request_->post(url, data, this->headers_);
 
 #ifdef USE_TIME
   if (this->backlog_max_depth_ != 0) {
-    if (this->http_request_->status_has_warning()) {
+    if (this->http_request_->status_has_error()) {
       if (this->backlog_.size() == this->backlog_max_depth_) {
 	ESP_LOGW(TAG, "Backlog is full, dropping oldest entry.");
 	this->backlog_.pop_front();
       }
       ESP_LOGD(TAG, "HTTP request failed, adding to backlog");
-      this->backlog_.emplace_back(url, data);
+      this->backlog_.emplace_back(url, std::move(data));
       ESP_LOGD(TAG, "Backlog depth: %zd", this->backlog_.size());
     } else {
       if (!this->backlog_.empty()) {
@@ -173,13 +163,8 @@ void InfluxDB::send_data(const std::string &url, const std::string &data) {
 	uint8_t item_count = 0;
 	do {
 	  const auto &m = this->backlog_.front();
-	  this->http_request_->set_url(m.url);
-	  this->http_request_->set_body(m.data);
-#ifdef USE_ESP_IDF
-	  auto response = this->http_request_->send();
-#else
-	  this->http_request_->send({});
-#endif
+	  auto response = this->http_request_->post(m.url, m.data, this->headers_);
+	  response->end();
 	  this->backlog_.pop_front();
 	  item_count++;
 	} while (!this->backlog_.empty() && (item_count < this->backlog_drain_batch_));
@@ -189,12 +174,7 @@ void InfluxDB::send_data(const std::string &url, const std::string &data) {
   }
 #endif
 
-#ifndef USE_ESP_IDF
-  this->http_request_->close();
-#endif
-
-  this->http_request_->set_headers({});
-  this->http_request_->set_body("");
+  response->end();
 }
 
 }  // namespace influxdb
