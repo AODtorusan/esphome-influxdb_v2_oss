@@ -1,0 +1,62 @@
+esphome:
+  name: influxdb-minimal
+  friendly_name: Minimal InfluxDB Example
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+wifi:
+  networks:
+    - ssid: example-network
+      password: network-password
+
+api:
+
+external_components:
+  - source: github://kpfleming/esphome-influxdb_v2_oss
+
+time:
+  - platform: homeassistant
+    timezone: EST5EDT,M3.2.0,M11.1.0
+
+sensor:
+  - id: _uptime
+    platform: uptime
+    name: ${node_name} Uptime
+    on_value:
+      then:
+        - if:
+            condition:
+              time.has_time:
+            then:
+              - influxdb.publish: _device_info
+
+  - id: _wifi_rssi
+    platform: wifi_signal
+    name: ${node_name} WiFi Signal
+
+http_request:
+  useragent: esphome/influxdb
+  timeout: 15s
+  watchdog_timeout: 15s
+
+influxdb_v2_oss:
+  url: http://influxdb.example.com:8086
+  organization: example
+  token: influxdb-token
+  time_id: _time
+  backlog_max_depth: 60
+  backlog_drain_batch: 10
+  tags:
+    device: ${node_name}
+  measurements:
+    - id: _device_info
+      bucket: iot_devices
+      name: info
+      sensors:
+        - sensor_id: _uptime
+          name: uptime
+        - sensor_id: _wifi_rssi
+          name: rssi
