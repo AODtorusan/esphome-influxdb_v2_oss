@@ -18,7 +18,8 @@ external_components:
   - source: github://kpfleming/esphome-influxdb_v2_oss
 
 time:
-  - platform: homeassistant
+  - id: _time
+    platform: homeassistant
     timezone: EST5EDT,M3.2.0,M11.1.0
 
 sensor:

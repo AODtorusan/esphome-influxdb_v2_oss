@@ -117,7 +117,7 @@ time* to do its work.
 
 This section is a walkthrough of [minimal.yml](examples/minimal.yml)
 from the `examples` directory. It is the most basic configuration
-needed to support the reporting basic device information (uptime and
+needed to support the reporting device information (uptime and
 WiFi RSSI) to InfluxDB.
 
 ```yaml
@@ -151,7 +151,8 @@ esphome-influxdb_v2_oss.
 
 ```yaml
 time:
-  - platform: homeassistant
+  - id: _time
+    platform: homeassistant
     timezone: EST5EDT,M3.2.0,M11.1.0
 ```
 
@@ -195,7 +196,8 @@ http_request:
   watchdog_timeout: 15s
 ```
 
-This section configures the `http_request` component.
+This section configures the `http_request` component, which is used by
+the InfluxDB component to publish measurements to the server.
 
 ```yaml
 influxdb_v2_oss:
