@@ -1,0 +1,219 @@
+esphome:
+  name: influxdb-full
+  friendly_name: Full InfluxDB Example
+
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: esp-idf
+
+logger:
+  hardware_uart: USB_SERIAL_JTAG
+
+wifi:
+  id: _wifi
+  networks:
+    - ssid: example-network
+      password: network-password
+
+api:
+
+external_components:
+  - source: github://kpfleming/esphome-influxdb_v2_oss
+
+time:
+  - id: _time
+    platform: homeassistant
+    timezone: EST5EDT,M3.2.0,M11.1.0
+
+uart:
+  - id: senseair_s8_uart
+    rx_pin: GPIO0
+    tx_pin: GPIO1
+    baud_rate: 9600
+
+  - id: pms5003_uart
+    rx_pin: GPIO20
+    tx_pin: GPIO21
+    baud_rate: 9600
+
+i2c:
+  sda: GPIO7
+  scl: GPIO6
+  frequency: 400kHz
+
+binary_sensor:
+  - id: _wifi_connected
+    platform: template
+    lambda: |-
+      return id(_wifi).is_connected();
+
+sensor:
+  - id: _uptime
+    platform: uptime
+    name: ${node_name} Uptime
+    on_value:
+      then:
+        - if:
+            condition:
+              time.has_time:
+            then:
+              - influxdb.publish: _device_info
+
+  - id: _wifi_rssi
+    platform: wifi_signal
+    name: ${node_name} WiFi Signal
+
+  - platform: pmsx003
+    type: PMSX003
+    uart_id: pms5003_uart
+    update_interval: 2min
+    pm_0_3um:
+      id: pm_0_3um
+      name: ${node_friendly_name} PM 0.3
+      filters:
+        - sliding_window_moving_average:
+            window_size: 30
+            send_every: 30
+    pm_1_0:
+      id: pm_1_0
+      name: ${node_friendly_name} PM 1.0
+      device_class: pm1
+      filters:
+        - sliding_window_moving_average:
+            window_size: 30
+            send_every: 30
+    pm_2_5:
+      id: pm_2_5
+      name: ${node_friendly_name} PM 2.5
+      device_class: pm25
+      filters:
+        - sliding_window_moving_average:
+            window_size: 30
+            send_every: 30
+    pm_10_0:
+      id: pm_10_0
+      name: ${node_friendly_name} PM 10.0
+      device_class: pm10
+      filters:
+        - sliding_window_moving_average:
+            window_size: 30
+            send_every: 30
+
+  - platform: senseair
+    uart_id: senseair_s8_uart
+    update_interval: 2min
+    co2:
+      id: co2
+      name: ${node_friendly_name} CO2
+      filters:
+        - skip_initial: 2
+        - clamp:
+            min_value: 400
+        - sliding_window_moving_average:
+            window_size: 30
+            send_every: 30
+
+  - platform: sht4x
+    address: 0x44
+    update_interval: 2min
+    temperature:
+      id: temperature_c
+      name: ${node_friendly_name} Temperature
+      filters:
+        - sliding_window_moving_average:
+            window_size: 30
+            send_every: 30
+
+  - id: temperature_f
+    platform: copy
+    source_id: temperature_c
+    unit_of_measurement: "°F"
+    filters:
+      - multiply: 1.8
+      - offset: 32.0
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      id: _wifi_ip_address
+
+http_request:
+  useragent: esphome/influxdb
+  timeout: 15s
+  watchdog_timeout: 15s
+
+influxdb_v2_oss:
+  url: http://influxdb.example.com:8086
+  organization: example
+  token: influxdb-token
+  time_id: _time
+  backlog_max_depth: 60
+  backlog_drain_batch: 10
+  tags:
+    device: ${node_name}
+  measurements:
+    - id: _device_info
+      bucket: iot_devices
+      name: info
+      sensors:
+        - sensor_id: _uptime
+          name: uptime
+          format: integer
+        - sensor_id: _wifi_rssi
+          name: rssi
+      binary_sensors:
+        - sensor_id: _wifi_connected
+          name: connected
+      text_sensors:
+        - sensor_id: _wifi_ip_address
+          name: ip_address
+
+    - id: _pm
+      bucket: air_quality
+      name: particulate_matter
+      sensors:
+        - sensor_id: pm_0_3um
+          raw_state: true
+        - sensor_id: pm_1_0
+          raw_state: true
+        - sensor_id: pm_2_5
+          raw_state: true
+        - sensor_id: pm_10_0
+          raw_state: true
+
+    - id: _co2
+      bucket: air_quality
+      name: carbon_dioxide
+      sensors:
+        - sensor_id: co2
+          format: unsigned_integer
+
+    - id: _temperature_c
+      bucket: air_quality
+      name: temperature
+      tags:
+        scale: C
+      sensors:
+        - sensor_id: temperature_c
+          name: temperature
+          accuracy_decimals: 1
+
+    - id: _temperature_f
+      bucket: air_quality
+      name: temperature
+      tags:
+        scale: F
+      sensors:
+        - sensor_id: temperature_f
+          name: temperature
+          accuracy_decimals: 1
+
+interval:
+  - interval: 30s
+    then:
+      - influxdb.publish_batch:
+          - _pm
+          - _co2
+          - _temperature_c
+          - _temperature_f
