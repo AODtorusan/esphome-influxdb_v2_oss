@@ -24,7 +24,7 @@ enables summarization and comparison in a reliable fashion.
 
 Multiple `measurements` can be published in a batch, ensuring that
 they all have the same timestamp if timestamping is enabled in the
-compoment. This permits summarizaton and comparison across
+component. This permits summarizaton and comparison across
 measurements without having to manipulate the timestamps
 (e.g. truncation) in the database query or reporting tool.
 
