@@ -51,7 +51,7 @@ if desired.
 
 When a `field` is published, its value can be either the raw sensor
 value, or the filtered value if the sensor configuration includes
-filters. This allows the Home Assistant dashboards to include valuues
+filters. This allows the Home Assistant dashboards to include values
 that have been transformed for display, but InfluxDB to receive the
 raw values, without having to use the `copy` component to make both
 values available.
