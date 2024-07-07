@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/setup-python@v5
         with:
-          python-version: 3.12
+          python-version: 3.11
       - uses: actions/checkout@v4
       - name: Install ESPHome
         run: pip install esphome
@@ -42,7 +42,7 @@ jobs:
     steps:
       - uses: actions/setup-python@v5
         with:
-          python-version: 3.12
+          python-version: 3.11
       - uses: actions/checkout@v4
       - name: Get ESPHome dev branch
         uses: actions/checkout@v4
