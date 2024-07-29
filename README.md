@@ -151,8 +151,7 @@ esphome-influxdb_v2_oss.
 
 ```yaml
 time:
-  - id: _time
-    platform: homeassistant
+  - platform: homeassistant
     timezone: EST5EDT,M3.2.0,M11.1.0
 ```
 
@@ -204,7 +203,6 @@ influxdb_v2_oss:
   url: http://influxdb.example.com:8086
   organization: example
   token: influxdb-token
-  time_id: _time
   backlog_max_depth: 60
   backlog_drain_batch: 10
   tags:
@@ -224,9 +222,6 @@ This final section configures the InfluxDB component itself.
 
 First, the basic details required to connect to the InfluxDB server:
 URL, organization, and token.
-
-Next, the ID of a 'time' component which the component can use to
-generate timestamps.
 
 The `backlog_max_depth` and `backlog_drain_batch` items control the
 maximum number of measurements which can be stored in memory while

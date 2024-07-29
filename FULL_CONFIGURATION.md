@@ -225,7 +225,9 @@ First, the basic details required to connect to the InfluxDB server:
 URL, organization, and token.
 
 Next, the ID of a 'time' component which the component can use to
-generate timestamps.
+generate timestamps. It is not necessary to specify `time_id` as the
+presence of a `time` component will be detected automatically, but it
+is available if an unusual configuration requires it.
 
 The `backlog_max_depth` and `backlog_drain_batch` items control the
 maximum number of measurements which can be stored in memory while
