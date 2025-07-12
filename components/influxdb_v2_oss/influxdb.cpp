@@ -98,6 +98,12 @@ void InfluxDB::setup() {
   }
 }
 
+#if ESPHOME_VERSION_CODE >= VERSION_CODE(2025, 7, 0)
+void InfluxDB::loop() {
+  this->disable_loop();
+}
+#endif
+
 void InfluxDB::publish_action(const Measurement *measurement) {
   std::string timestamp;
   auto db = measurement->get_parent();

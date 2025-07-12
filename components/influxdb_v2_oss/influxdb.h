@@ -41,6 +41,9 @@ class Measurement;
 class InfluxDB : public Component {
 public:
   void setup();
+#if ESPHOME_VERSION_CODE >= VERSION_CODE(2025, 7, 0)
+  void loop();
+#endif
   void set_http_request(http_request::HttpRequestComponent *http) { this->http_request_ = http; };
   void set_url(std::string url) { this->url_ = std::move(url); }
   void set_token(std::string token) { this->token_ = std::string("Token ") + token; }
