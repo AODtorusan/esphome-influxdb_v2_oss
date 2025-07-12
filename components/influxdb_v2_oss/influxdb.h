@@ -40,9 +40,9 @@ class Measurement;
 
 class InfluxDB : public Component {
 public:
-  void setup();
+  void setup() override;
 #if ESPHOME_VERSION_CODE >= VERSION_CODE(2025, 7, 0)
-  void loop();
+  void loop() override;
 #endif
   void set_http_request(http_request::HttpRequestComponent *http) { this->http_request_ = http; };
   void set_url(std::string url) { this->url_ = std::move(url); }
