@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/setup-python@v5
         with:
-          python-version: 3.11
+          python-version: 3.13
       - uses: actions/checkout@v4
       - name: Install ESPHome
         run: pip install esphome
@@ -42,7 +42,7 @@ jobs:
     steps:
       - uses: actions/setup-python@v5
         with:
-          python-version: 3.11
+          python-version: 3.13
       - uses: actions/checkout@v4
       - name: Get ESPHome dev branch
         uses: actions/checkout@v4
@@ -56,10 +56,12 @@ jobs:
       - name: Test compilation of minimal example
         run: |-
           workflow-support/fix-example-for-ci examples/minimal.yml
+          source venv/bin/activate
           cd examples
           esphome compile minimal.yml
       - name: Test compilation of full example
         run: |-
           workflow-support/fix-example-for-ci examples/full.yml
+          source venv/bin/activate
           cd examples
           esphome compile full.yml
