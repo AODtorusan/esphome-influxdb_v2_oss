@@ -56,12 +56,12 @@ jobs:
       - name: Test compilation of minimal example
         run: |-
           workflow-support/fix-example-for-ci examples/minimal.yml
-          source venv/bin/activate
+          source esphome/venv/bin/activate
           cd examples
           esphome compile minimal.yml
       - name: Test compilation of full example
         run: |-
           workflow-support/fix-example-for-ci examples/full.yml
-          source venv/bin/activate
+          source esphome/venv/bin/activate
           cd examples
           esphome compile full.yml
