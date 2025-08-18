@@ -20,7 +20,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: 3.13
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install ESPHome
         run: pip install esphome
       - name: Test compilation of minimal example
@@ -43,9 +43,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: 3.13
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Get ESPHome dev branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: esphome/esphome
           ref: dev
