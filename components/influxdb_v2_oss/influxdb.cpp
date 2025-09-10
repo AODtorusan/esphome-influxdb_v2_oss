@@ -4,13 +4,13 @@ namespace esphome {
 namespace influxdb {
 
 #ifdef USE_BINARY_SENSOR
-void BinarySensorField::publish(std::string &line) const {
+void BinarySensorField::to_line(std::string &line) const {
   line += (this->sensor_->state ? 'T' : 'F');
 }
 #endif
 
 #ifdef USE_SENSOR
-void SensorField::publish(std::string &line) const {
+void SensorField::to_line(std::string &line) const {
   float state;
 
   if (this->raw_state_) {
@@ -34,7 +34,7 @@ void SensorField::publish(std::string &line) const {
 #endif
 
 #ifdef USE_TEXT_SENSOR
-void TextSensorField::publish(std::string &line) const {
+void TextSensorField::to_line(std::string &line) const {
   line += '"';
 
   if (this->raw_state_) {
@@ -47,7 +47,7 @@ void TextSensorField::publish(std::string &line) const {
 }
 #endif
 
-std::string Measurement::publish(const std::string &timestamp) const {
+std::string Measurement::to_line(const std::string &timestamp) const {
   std::string line{this->line_prefix_};
   char sensor_sep = ' ';
 
@@ -66,7 +66,7 @@ std::string Measurement::publish(const std::string &timestamp) const {
 
     line += '=';
 
-    field->publish(line);
+    field->to_line(line);
 
     sensor_sep = ',';
   }
@@ -98,38 +98,62 @@ void InfluxDB::setup() {
   }
 }
 
-#if ESPHOME_VERSION_CODE >= VERSION_CODE(2025, 7, 0)
 void InfluxDB::loop() {
+  if (!this->backlog_.empty()) {
+    ESP_LOGD(TAG, "Sending InfluxDB lines to server");
+    uint8_t item_count = 0;
+    do {
+      const auto &m = this->backlog_.front();
+
+      auto success = this->send_data(m.url, m.data);
+      if (success) {
+        this->backlog_.pop_front();
+        item_count++;
+      } else {
+        break;
+      }
+    } while (!this->backlog_.empty() && (item_count < this->backlog_drain_batch_));
+    ESP_LOGD(TAG, "Drained %d items from backlog", item_count);
+  }
   this->disable_loop();
 }
-#endif
 
-void InfluxDB::publish_action(const Measurement *measurement) {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+void InfluxDB::queue_action(const Measurement *measurement) {
   std::string timestamp;
   auto db = measurement->get_parent();
 
-#ifdef USE_TIME
   if (db->clock_ != nullptr) {
     auto time = db->clock_->now();
     timestamp = str_sprintf(" %jd", (intmax_t) time.timestamp);
   }
-#endif
 
-  db->send_data(measurement->get_url(), measurement->publish(timestamp));
+  db->queue(measurement->get_url(), measurement->to_line(timestamp));
 }
 
-void InfluxDB::publish_batch_action(std::list<const Measurement *> measurements) {
+void InfluxDB::queue_batch_action(std::list<const Measurement *> measurements) {
   std::string timestamp;
   auto db = measurements.front()->get_parent();
   auto url = measurements.front()->get_url();
   std::string data;
 
-#ifdef USE_TIME
   if (db->clock_ != nullptr) {
     auto time = db->clock_->now();
     timestamp = str_sprintf(" %jd", (intmax_t) time.timestamp);
   }
-#endif
 
   for (auto measurement : measurements) {
     if (measurement->get_parent() != db) {
@@ -142,60 +166,45 @@ void InfluxDB::publish_batch_action(std::list<const Measurement *> measurements)
       continue;
     }
 
-    data += measurement->publish(timestamp);
+    data += measurement->to_line(timestamp);
   }
 
-  db->send_data(url, std::move(data));
+  db->queue(url, std::move(data));
 }
 
-void InfluxDB::send_data(const std::string &url, std::string &&data) {
+void InfluxDB::queue(const std::string &url, std::string &&data) {
+  ESP_LOGD(TAG, "Adding data into the InfluxDB queue for %s", url.c_str());
+  if (this->backlog_.size() == this->backlog_max_depth_) {
+    ESP_LOGW(TAG, "Backlog is full, dropping oldest entries.");
+    this->backlog_.pop_front();
+  }
+  this->backlog_.emplace_back(url, std::move(data));
+  ESP_LOGD(TAG, "Backlog depth: %zd", this->backlog_.size());
+  this->enable_loop();
+}
+
+bool InfluxDB::send_data(const std::string &url, const std::string &data) {
   uint8_t buf[1024];
 
   ESP_LOGD(TAG, "Publishing: %s", data.c_str());
 
   auto response = this->http_request_->post(url, data, this->headers_);
 
-  if (response != nullptr && !this->http_request_->status_has_error()) {
-    while (response->read(buf, sizeof(buf)) != 0) {}
+  if (response == nullptr) {
+    ESP_LOGW(TAG, "Error sending metrics to %s", data.c_str());
+    return false;
+  }
+  auto status_code = response->status_code;
+  if (status_code != 204) {
+    ESP_LOGW(TAG, "Error sending metrics to %s: HTTP %d", data.c_str(), status_code);
+    return false;
   }
 
-#ifdef USE_TIME
-  if (this->backlog_max_depth_ != 0) {
-    if (this->http_request_->status_has_error()) {
-      if (this->backlog_.size() == this->backlog_max_depth_) {
-	ESP_LOGW(TAG, "Backlog is full, dropping oldest entry.");
-	this->backlog_.pop_front();
-      }
-      ESP_LOGD(TAG, "HTTP request failed, adding to backlog");
-      this->backlog_.emplace_back(url, std::move(data));
-      ESP_LOGD(TAG, "Backlog depth: %zd", this->backlog_.size());
-    } else {
-      if (!this->backlog_.empty()) {
-	ESP_LOGD(TAG, "HTTP request succeeded, draining items from backlog");
-	uint8_t item_count = 0;
-	do {
-	  const auto &m = this->backlog_.front();
+  // Drain the response
+  while (response->read(buf, sizeof(buf)) != 0) {}
+  response->end();
 
-	  auto response = this->http_request_->post(m.url, m.data, this->headers_);
-	  if (response == nullptr || this->http_request_->status_has_error()) {
-	    break;
-	  }
-
-	  while (response->read(buf, sizeof(buf)) != 0) {}
-	  response->end();
-	  this->backlog_.pop_front();
-	  item_count++;
-
-	} while (!this->backlog_.empty() && (item_count < this->backlog_drain_batch_));
-	ESP_LOGD(TAG, "Drained %d items from backlog", item_count - 1);
-      }
-    }
-  }
-#endif
-
-  if (response != nullptr) {
-    response->end();
-  }
+  return true;
 }
 
 }  // namespace influxdb

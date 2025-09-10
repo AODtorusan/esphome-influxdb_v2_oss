@@ -32,7 +32,7 @@ sensor:
             condition:
               time.has_time:
             then:
-              - influxdb.publish: _device_info
+              - influxdb.queue: _device_info
 
   - id: _wifi_rssi
     platform: wifi_signal

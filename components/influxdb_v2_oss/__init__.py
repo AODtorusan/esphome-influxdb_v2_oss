@@ -82,9 +82,7 @@ MEASUREMENTS_SCHEMA = cv.All(
                     cv.Schema(
                         {
                             cv.GenerateID(): cv.declare_id(BinarySensorField),
-                            cv.Required(CONF_SENSOR_ID): cv.use_id(
-                                binary_sensor.BinarySensor
-                            ),
+                            cv.Required(CONF_SENSOR_ID): cv.use_id(binary_sensor.BinarySensor),
                             cv.Optional(CONF_NAME): valid_identifier,
                         }
                     ),
@@ -98,12 +96,8 @@ MEASUREMENTS_SCHEMA = cv.All(
                             cv.GenerateID(): cv.declare_id(SensorField),
                             cv.Required(CONF_SENSOR_ID): cv.use_id(sensor.Sensor),
                             cv.Optional(CONF_NAME): valid_identifier,
-                            cv.Optional(CONF_FORMAT, default="float"): cv.enum(
-                                SENSOR_FORMATS
-                            ),
-                            cv.Optional(
-                                CONF_ACCURACY_DECIMALS,
-                            ): cv.positive_not_null_int,
+                            cv.Optional(CONF_FORMAT, default="float"): cv.enum(SENSOR_FORMATS),
+                            cv.Optional(CONF_ACCURACY_DECIMALS): cv.positive_not_null_int,
                             cv.Optional(CONF_RAW_STATE, default=False): cv.boolean,
                         }
                     ),
@@ -116,9 +110,7 @@ MEASUREMENTS_SCHEMA = cv.All(
                     cv.Schema(
                         {
                             cv.GenerateID(): cv.declare_id(TextSensorField),
-                            cv.Required(CONF_SENSOR_ID): cv.use_id(
-                                text_sensor.TextSensor
-                            ),
+                            cv.Required(CONF_SENSOR_ID): cv.use_id(text_sensor.TextSensor),
                             cv.Optional(CONF_NAME): valid_identifier,
                             cv.Optional(CONF_RAW_STATE, default=False): cv.boolean,
                         }
@@ -152,9 +144,9 @@ CONFIG_SCHEMA = cv.All(
             cv.Required(CONF_URL): cv.url,
             cv.Required(CONF_ORGANIZATION): cv.string,
             cv.Optional(CONF_TOKEN): cv.string,
-            cv.OnlyWith(CONF_TIME_ID, "time"): cv.use_id(RealTimeClock),
+            cv.Required(CONF_TIME_ID): cv.use_id(RealTimeClock),
             cv.Optional(CONF_TAGS): cv.Schema({valid_identifier: cv.string}),
-            cv.Optional(CONF_BACKLOG_MAX_DEPTH): cv.int_range(min=1, max=200),
+            cv.Optional(CONF_BACKLOG_MAX_DEPTH, default=10): cv.int_range(min=1, max=200),
             cv.Optional(CONF_BACKLOG_DRAIN_BATCH): cv.int_range(min=1, max=20),
             cv.Required(CONF_MEASUREMENTS): cv.ensure_list(MEASUREMENTS_SCHEMA),
         }
@@ -181,15 +173,14 @@ async def to_code(config):
     if token := config.get(CONF_TOKEN):
         cg.add(db.set_token(token))
 
-    if clock_id := config.get(CONF_TIME_ID):
-        clock = await cg.get_variable(clock_id)
-        cg.add(db.set_clock(clock))
+    clock = await cg.get_variable( config.get(CONF_TIME_ID) )
+    cg.add(db.set_clock(clock))
 
-        if backlog_max_depth := config.get(CONF_BACKLOG_MAX_DEPTH):
-            cg.add(db.set_backlog_max_depth(backlog_max_depth))
+    if backlog_max_depth := config.get(CONF_BACKLOG_MAX_DEPTH):
+        cg.add(db.set_backlog_max_depth(backlog_max_depth))
 
-            if backlog_drain_batch := config.get(CONF_BACKLOG_DRAIN_BATCH):
-                cg.add(db.set_backlog_drain_batch(backlog_drain_batch))
+        if backlog_drain_batch := config.get(CONF_BACKLOG_DRAIN_BATCH):
+            cg.add(db.set_backlog_drain_batch(backlog_drain_batch))
 
     parent_tag_string = ""
     if tags := config.get(CONF_TAGS):
@@ -246,6 +237,7 @@ async def to_code(config):
 
                 cg.add(meas.add_sensor_field(var))
 
+
         if text_sensors := measurement.get(CONF_TEXT_SENSORS):
             for conf in text_sensors:
                 var = cg.new_Pvariable(conf[CONF_ID])
@@ -260,8 +252,8 @@ async def to_code(config):
                 cg.add(meas.add_text_sensor_field(var))
 
 
-CONF_INFLUXDB_PUBLISH = "influxdb.publish"
-INFLUXDB_PUBLISH_ACTION_SCHEMA = automation.maybe_simple_id(
+CONF_INFLUXDB_QUEUE = "influxdb.queue"
+INFLUXDB_QUEUE_ACTION_SCHEMA = automation.maybe_simple_id(
     {
         cv.GenerateID(): cv.use_id(Measurement),
     }
@@ -269,26 +261,26 @@ INFLUXDB_PUBLISH_ACTION_SCHEMA = automation.maybe_simple_id(
 
 
 @automation.register_action(
-    CONF_INFLUXDB_PUBLISH, automation.LambdaAction, INFLUXDB_PUBLISH_ACTION_SCHEMA
+    CONF_INFLUXDB_QUEUE, automation.LambdaAction, INFLUXDB_QUEUE_ACTION_SCHEMA
 )
-async def influxdb_publish_action_to_code(config, action_id, template_arg, args):
+async def influxdb_queue_action_to_code(config, action_id, template_arg, args):
     meas = await cg.get_variable(config[CONF_ID])
-    text = str(cg.statement(InfluxDBStatics.publish_action(meas)))
+    text = str(cg.statement(InfluxDBStatics.queue_action(meas)))
     lambda_ = await cg.process_lambda(Lambda(text), args, return_type=cg.void)
     return cg.new_Pvariable(action_id, template_arg, lambda_)
 
 
-CONF_INFLUXDB_PUBLISH_BATCH = "influxdb.publish_batch"
-INFLUXDB_PUBLISH_BATCH_ACTION_SCHEMA = cv.ensure_list(cv.use_id(Measurement))
+CONF_INFLUXDB_QUEUE_BATCH = "influxdb.queue_batch"
+INFLUXDB_QUEUE_BATCH_ACTION_SCHEMA = cv.ensure_list(cv.use_id(Measurement))
 
 
 @automation.register_action(
-    CONF_INFLUXDB_PUBLISH_BATCH,
+    CONF_INFLUXDB_QUEUE_BATCH,
     automation.LambdaAction,
-    INFLUXDB_PUBLISH_BATCH_ACTION_SCHEMA,
+    INFLUXDB_QUEUE_BATCH_ACTION_SCHEMA,
 )
-async def influxdb_publish_batch_action_to_code(config, action_id, template_arg, args):
+async def influxdb_queue_batch_action_to_code(config, action_id, template_arg, args):
     meas = [await cg.get_variable(m) for m in config]
-    text = str(cg.statement(InfluxDBStatics.publish_batch_action(meas)))
+    text = str(cg.statement(InfluxDBStatics.queue_batch_action(meas)))
     lambda_ = await cg.process_lambda(Lambda(text), args, return_type=cg.void)
     return cg.new_Pvariable(action_id, template_arg, lambda_)

@@ -16,9 +16,7 @@
 #include "esphome/components/text_sensor/text_sensor.h"
 #endif
 
-#ifdef USE_TIME
 #include "esphome/components/time/real_time_clock.h"
-#endif
 
 #include <list>
 #include <vector>
@@ -41,38 +39,33 @@ class Measurement;
 class InfluxDB : public Component {
 public:
   void setup() override;
-#if ESPHOME_VERSION_CODE >= VERSION_CODE(2025, 7, 0)
   void loop() override;
-#endif
   void set_http_request(http_request::HttpRequestComponent *http) { this->http_request_ = http; };
   void set_url(std::string url) { this->url_ = std::move(url); }
   void set_token(std::string token) { this->token_ = std::string("Token ") + token; }
-#ifdef USE_TIME
   void set_clock(time::RealTimeClock *clock) { this->clock_ = clock; }
   void set_backlog_max_depth(uint8_t val) { this->backlog_max_depth_ = val; }
   void set_backlog_drain_batch(uint8_t val) { this->backlog_drain_batch_ = val; }
-#endif
 
   float get_setup_priority() const override { return setup_priority::LATE; }
 
-  static void publish_action(const Measurement *measurement);
-  static void publish_batch_action(std::list<const Measurement *> measurements);
+  static void queue_action(const Measurement *measurement);
+  static void queue_batch_action(std::list<const Measurement *> measurements);
 
   const std::string &get_url() { return this->url_; }
 
 protected:
-  void send_data(const std::string &url, std::string &&data);
+  void queue(const std::string &url, std::string &&data);
+  bool send_data(const std::string &url, const std::string &data);
 
   http_request::HttpRequestComponent *http_request_;
   std::string url_;
   std::string token_;
   std::list<http_request::Header> headers_;
-#ifdef USE_TIME
   time::RealTimeClock *clock_{nullptr};
   std::list<BacklogEntry> backlog_;
-  uint8_t backlog_max_depth_{0};
+  uint8_t backlog_max_depth_{10};
   uint8_t backlog_drain_batch_{1};
-#endif
 };
 
 class Field {
@@ -82,7 +75,7 @@ public:
 
   virtual bool sensor_has_state() const = 0;
   virtual std::string sensor_object_id() const = 0;
-  virtual void publish(std::string &line) const = 0;
+  virtual void to_line(std::string &line) const = 0;
 
 protected:
   std::string field_name_;
@@ -95,7 +88,7 @@ public:
 
   bool sensor_has_state() const override { return this->sensor_->has_state(); }
   std::string sensor_object_id() const override { return this->sensor_->get_object_id(); }
-  void publish(std::string &line) const override;
+  void to_line(std::string &line) const override;
 
 protected:
   const binary_sensor::BinarySensor *sensor_;
@@ -122,7 +115,7 @@ public:
 
   bool sensor_has_state() const override { return this->sensor_->has_state(); }
   std::string sensor_object_id() const override { return this->sensor_->get_object_id(); }
-  void publish(std::string &line) const override;
+  void to_line(std::string &line) const override;
 
 protected:
   const sensor::Sensor *sensor_;
@@ -140,7 +133,7 @@ public:
 
   bool sensor_has_state() const override { return this->sensor_->has_state(); }
   std::string sensor_object_id() const override { return this->sensor_->get_object_id(); }
-  void publish(std::string &line) const override;
+  void to_line(std::string &line) const override;
 
 protected:
   text_sensor::TextSensor *sensor_;
@@ -170,7 +163,7 @@ public:
   void add_text_sensor_field(const TextSensorField *sensor) { this->fields_.push_back(sensor); }
 #endif
 
-  std::string publish(const std::string &timestamp) const;
+  std::string to_line(const std::string &timestamp) const;
 
 protected:
   InfluxDB *parent_;

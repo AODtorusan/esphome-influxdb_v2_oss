@@ -91,7 +91,7 @@ sensor:
             condition:
               time.has_time:
             then:
-              - influxdb.publish: _device_info
+              - influxdb.queue: _device_info
 
   - id: _wifi_rssi
     platform: wifi_signal
@@ -203,7 +203,7 @@ http_request:
 ```
 
 This section configures the `http_request` component, which is used by
-the InfluxDB component to publish measurements to the server.
+the InfluxDB component to queue measurements to the server.
 
 ```yaml
 influxdb_v2_oss:
@@ -219,7 +219,7 @@ influxdb_v2_oss:
 ```
 
 This section configures the InfluxDB component itself, but not the
-measurements to be published (see below for those).
+measurements to be queued (see below for those).
 
 First, the basic details required to connect to the InfluxDB server:
 URL, organization, and token.
@@ -239,7 +239,7 @@ of queued measurements when the InfluxDB server becomes reachable
 after a period of unreachability.
 
 The 'tags' section configures tags (keys and values) which will be
-added to all measurements published by the component. In this case a
+added to all measurements queued by the component. In this case a
 tag named `device` will be sent containing the ESPHome `node_name`.
 
 ```yaml
@@ -261,18 +261,18 @@ tag named `device` will be sent containing the ESPHome `node_name`.
 ```
 
 This section configures the first measurement. It has an ID which can
-be supplied to the `influxdb.publish` action to trigger publication, a
+be supplied to the `influxdb.queue` action to trigger publication, a
 bucket name to receive the measurement, and a name ('info'). The
 measurement will contain values from four sensors (specified by their
 IDs), with names supplied to override the default names ('uptime'
 instead of '_uptime' and 'rssi' instead of '_wifi_rssi', etc.)
 
-One of the sensors is also published as an integer instead of the
+One of the sensors is also queued as an integer instead of the
 default floating-point format, sine the unit's uptime is always a
 whole number of seconds.
 
 It may be useful to note that if the WiFi network is not connected,
-the value of `_wifi_connected` will be `false`, but publishing to the
+the value of `_wifi_connected` will be `false`, but queuing to the
 InfluxDB server will not be possible. Because this configuration
 includes a `time` component and the InfluxDB backlog is enabled, the
 measurements containing a `false` value will be queued in the backlog
@@ -294,7 +294,7 @@ until the server becomes reachable again.
 ```
 
 This section configures another measurement, and demonstrates how the
-component can publish the 'raw' state of a numeric (or text)
+component can queue the 'raw' state of a numeric (or text)
 sensor. In this case the referenced sensors have
 `sliding_window_moving_average` filters which are used to smooth out
 the data reported to Home Assistant, but the data reported to InfluxDB
@@ -311,7 +311,7 @@ will be the raw data.
 
 This section configures another measurement, and demonstrates how a
 numeric sensor (which has a floating-point value in ESPHome) can be
-published as an 'unsigned integer' to InfluxDB.
+queued as an 'unsigned integer' to InfluxDB.
 
 ```yaml
     - id: _temperature_c
@@ -350,14 +350,14 @@ rounded to a specified number of decimal places.
 interval:
   - interval: 30s
     then:
-      - influxdb.publish_batch:
+      - influxdb.queue_batch:
           - _pm
           - _co2
           - _temperature_c
           - _temperature_f
 ```
 
-The final section sets up an `interval` timer to publish some of the
-measurements every 30 seconds. The `publish_batch` action is used
-to ensure that all of the referenced measurements are published with
+The final section sets up an `interval` timer to queue some of the
+measurements every 30 seconds. The `queue_batch` action is used
+to ensure that all of the referenced measurements are queued with
 identical timestamps.
