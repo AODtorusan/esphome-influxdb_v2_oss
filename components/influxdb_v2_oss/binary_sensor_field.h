@@ -1,0 +1,28 @@
+#pragma once
+
+#include "field.h"
+
+#ifdef USE_BINARY_SENSOR
+#include "esphome/components/binary_sensor/binary_sensor.h"
+
+namespace esphome {
+namespace influxdb {
+
+#ifdef USE_BINARY_SENSOR
+class BinarySensorField : public Field {
+public:
+  void set_sensor(const binary_sensor::BinarySensor *sensor) { this->sensor_ = sensor; }
+
+  bool sensor_has_state() const override { return this->sensor_->has_state(); }
+  std::string sensor_object_id() const override { return this->sensor_->get_object_id(); }
+  void to_line(std::string &line) const override;
+
+protected:
+  const binary_sensor::BinarySensor *sensor_;
+};
+#endif
+
+}  // namespace influxdb
+}  // namespace esphome
+
+#endif

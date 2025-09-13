@@ -44,7 +44,7 @@ InfluxDB = influxdb_ns.class_("InfluxDB", cg.Component)
 InfluxDBStatics = influxdb_ns.namespace("InfluxDB")
 Measurement = influxdb_ns.class_("Measurement")
 BinarySensorField = influxdb_ns.class_("BinarySensorField")
-SensorField = influxdb_ns.class_("SensorField")
+NumericSensorField = influxdb_ns.class_("NumericSensorField")
 TextSensorField = influxdb_ns.class_("TextSensorField")
 
 
@@ -93,7 +93,7 @@ MEASUREMENTS_SCHEMA = cv.All(
                 cv.maybe_simple_value(
                     cv.Schema(
                         {
-                            cv.GenerateID(): cv.declare_id(SensorField),
+                            cv.GenerateID(): cv.declare_id(NumericSensorField),
                             cv.Required(CONF_SENSOR_ID): cv.use_id(sensor.Sensor),
                             cv.Optional(CONF_NAME): valid_identifier,
                             cv.Optional(CONF_FORMAT, default="float"): cv.enum(SENSOR_FORMATS),
@@ -218,7 +218,7 @@ async def to_code(config):
                 if name := conf.get(CONF_NAME):
                     cg.add(var.set_field_name(escape_identifier(name)))
 
-                cg.add(meas.add_binary_sensor_field(var))
+                cg.add(meas.add_field(var))
 
         if sensors := measurement.get(CONF_SENSORS):
             for conf in sensors:
@@ -235,7 +235,7 @@ async def to_code(config):
                 if name := conf.get(CONF_NAME):
                     cg.add(var.set_field_name(escape_identifier(name)))
 
-                cg.add(meas.add_sensor_field(var))
+                cg.add(meas.add_field(var))
 
 
         if text_sensors := measurement.get(CONF_TEXT_SENSORS):
@@ -249,7 +249,7 @@ async def to_code(config):
                 if name := conf.get(CONF_NAME):
                     cg.add(var.set_field_name(escape_identifier(name)))
 
-                cg.add(meas.add_text_sensor_field(var))
+                cg.add(meas.add_field(var))
 
 
 CONF_INFLUXDB_QUEUE = "influxdb.queue"

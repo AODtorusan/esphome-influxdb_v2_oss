@@ -1,80 +1,8 @@
 #include "influxdb.h"
+#include "measurement.h"
 
 namespace esphome {
 namespace influxdb {
-
-#ifdef USE_BINARY_SENSOR
-void BinarySensorField::to_line(std::string &line) const {
-  line += (this->sensor_->state ? 'T' : 'F');
-}
-#endif
-
-#ifdef USE_SENSOR
-void SensorField::to_line(std::string &line) const {
-  float state;
-
-  if (this->raw_state_) {
-    state = this->sensor_->get_raw_state();
-  } else {
-    state = this->sensor_->get_state();
-  }
-
-  switch (this->format_) {
-  case SensorFieldFormat::Float:
-    line += value_accuracy_to_string(state, this->accuracy_decimals_);
-    break;
-  case SensorFieldFormat::Integer:
-    line += str_sprintf("%ldi", std::lroundf(state));
-    break;
-  case SensorFieldFormat::UnsignedInteger:
-    line += str_sprintf("%ldu", std::lroundf(std::abs(state)));
-    break;
-  }
-}
-#endif
-
-#ifdef USE_TEXT_SENSOR
-void TextSensorField::to_line(std::string &line) const {
-  line += '"';
-
-  if (this->raw_state_) {
-    line += this->sensor_->get_raw_state();
-  } else {
-    line += this->sensor_->get_state();
-  }
-
-  line += '"';
-}
-#endif
-
-std::string Measurement::to_line(const std::string &timestamp) const {
-  std::string line{this->line_prefix_};
-  char sensor_sep = ' ';
-
-  for (const auto field : this->fields_) {
-    if (!field->sensor_has_state()) {
-      continue;
-    }
-
-    line += sensor_sep;
-
-    if (!field->get_field_name().empty()) {
-      line += field->get_field_name();
-    } else {
-      line += field->sensor_object_id();
-    }
-
-    line += '=';
-
-    field->to_line(line);
-
-    sensor_sep = ',';
-  }
-
-  line += timestamp + '\n';
-
-  return line;
-}
 
 void InfluxDB::setup() {
   http_request::Header header;
@@ -117,20 +45,6 @@ void InfluxDB::loop() {
   }
   this->disable_loop();
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 void InfluxDB::queue_action(const Measurement *measurement) {
   std::string timestamp;
