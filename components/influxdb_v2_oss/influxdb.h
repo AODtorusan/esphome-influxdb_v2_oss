@@ -33,6 +33,7 @@ public:
   void set_clock(time::RealTimeClock *clock) { this->clock_ = clock; }
   void set_backlog_max_depth(uint8_t val) { this->backlog_max_depth_ = val; }
   void set_backlog_drain_batch(uint8_t val) { this->backlog_drain_batch_ = val; }
+  void add_measurement(Measurement *measurement) { this->measurements_.push_back(measurement); }
 
   float get_setup_priority() const override { return setup_priority::LATE; }
 
@@ -49,6 +50,7 @@ protected:
   std::string url_;
   std::string token_;
   std::list<http_request::Header> headers_;
+  std::list<Measurement*> measurements_;
   time::RealTimeClock *clock_{nullptr};
   std::list<BacklogEntry> backlog_;
   uint8_t backlog_max_depth_{10};

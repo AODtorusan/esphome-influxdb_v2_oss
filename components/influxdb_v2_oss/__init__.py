@@ -182,11 +182,9 @@ async def to_code(config):
         if backlog_drain_batch := config.get(CONF_BACKLOG_DRAIN_BATCH):
             cg.add(db.set_backlog_drain_batch(backlog_drain_batch))
 
-    parent_tag_string = ""
+    common_tags = {}
     if tags := config.get(CONF_TAGS):
-        parent_tag_string = "".join(
-            [f",{escape_identifier(k)}={escape_identifier(v)}" for k, v in tags.items()]
-        )
+        common_tags = tags
 
     for measurement in config.get(CONF_MEASUREMENTS):
         meas = cg.new_Pvariable(measurement[CONF_ID], db)
@@ -194,20 +192,11 @@ async def to_code(config):
         bucket = measurement[CONF_BUCKET]
         cg.add(meas.set_bucket(bucket))
 
-        tag_string = ""
+        measurement_tags = common_tags.copy()
         if tags := measurement.get(CONF_TAGS):
-            tag_string = "".join(
-                [
-                    f",{escape_identifier(k)}={escape_identifier(v)}"
-                    for k, v in tags.items()
-                ]
-            )
+            measurement_tags |= tags
 
-        cg.add(
-            meas.set_line_prefix(
-                f"{escape_identifier(measurement[CONF_NAME])}{parent_tag_string}{tag_string}"
-            )
-        )
+        cg.add(meas.set_name(escape_identifier(measurement[CONF_NAME])))
 
         if binary_sensors := measurement.get(CONF_BINARY_SENSORS):
             for conf in binary_sensors:
@@ -217,6 +206,11 @@ async def to_code(config):
 
                 if name := conf.get(CONF_NAME):
                     cg.add(var.set_field_name(escape_identifier(name)))
+                # else:
+                #     TODO
+
+                for key, value in measurement_tags.items():
+                    cg.add(var.add_tag(escape_identifier(key), escape_identifier(value)))
 
                 cg.add(meas.add_field(var))
 
@@ -234,6 +228,11 @@ async def to_code(config):
 
                 if name := conf.get(CONF_NAME):
                     cg.add(var.set_field_name(escape_identifier(name)))
+                # else:
+                #     TODO
+
+                for key, value in measurement_tags.items():
+                    cg.add(var.add_tag(escape_identifier(key), escape_identifier(value)))
 
                 cg.add(meas.add_field(var))
 
@@ -248,6 +247,11 @@ async def to_code(config):
 
                 if name := conf.get(CONF_NAME):
                     cg.add(var.set_field_name(escape_identifier(name)))
+                # else:
+                #     TODO
+
+                for key, value in measurement_tags.items():
+                    cg.add(var.add_tag(escape_identifier(key), escape_identifier(value)))
 
                 cg.add(meas.add_field(var))
 

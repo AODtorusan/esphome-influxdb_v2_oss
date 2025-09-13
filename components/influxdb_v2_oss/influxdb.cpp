@@ -24,6 +24,10 @@ void InfluxDB::setup() {
     header.value = this->token_.c_str();
     this->headers_.push_back(header);
   }
+
+  for (auto measurement : this->measurements_) {
+    measurement->setup();
+  }
 }
 
 void InfluxDB::loop() {
@@ -61,7 +65,7 @@ void InfluxDB::queue_action(const Measurement *measurement) {
 void InfluxDB::queue_batch_action(std::list<const Measurement *> measurements) {
   std::string timestamp;
   auto db = measurements.front()->get_parent();
-  auto url = measurements.front()->get_url();
+  const std::string& url = measurements.front()->get_url();
   std::string data;
 
   if (db->clock_ != nullptr) {
@@ -87,20 +91,17 @@ void InfluxDB::queue_batch_action(std::list<const Measurement *> measurements) {
 }
 
 void InfluxDB::queue(const std::string &url, std::string &&data) {
-  ESP_LOGD(TAG, "Adding data into the InfluxDB queue for %s", url.c_str());
+  ESP_LOGD(TAG, "Adding data (%d) into the InfluxDB queue for %s", data.size(), url.c_str());
   if (this->backlog_.size() == this->backlog_max_depth_) {
     ESP_LOGW(TAG, "Backlog is full, dropping oldest entries.");
     this->backlog_.pop_front();
   }
   this->backlog_.emplace_back(url, std::move(data));
-  ESP_LOGD(TAG, "Backlog depth: %zd", this->backlog_.size());
   this->enable_loop();
 }
 
 bool InfluxDB::send_data(const std::string &url, const std::string &data) {
-  uint8_t buf[1024];
-
-  ESP_LOGD(TAG, "Publishing: %s", data.c_str());
+  uint8_t buf[32];
 
   auto response = this->http_request_->post(url, data, this->headers_);
 

@@ -4,33 +4,25 @@
 namespace esphome {
 namespace influxdb {
 
-std::string Measurement::to_line(const std::string &timestamp) const {
-  std::string line{this->line_prefix_};
-  char sensor_sep = ' ';
+void Measurement::setup() {
+  for (auto field : this->fields_) {
+    field->setup();
+  }
+}
 
+std::string Measurement::to_line(const std::string &timestamp) const {
+  std::string lines;
+  lines.reserve( 128 * this->fields_.size() );
   for (const auto field : this->fields_) {
     if (!field->sensor_has_state()) {
       continue;
     }
-
-    line += sensor_sep;
-
-    if (!field->get_field_name().empty()) {
-      line += field->get_field_name();
-    } else {
-      line += field->sensor_object_id();
-    }
-
-    line += '=';
-
-    field->to_line(line);
-
-    sensor_sep = ',';
+    lines += this->name_;
+    lines += ',';
+    field->to_line(lines);
+    lines += timestamp + '\n';
   }
-
-  line += timestamp + '\n';
-
-  return line;
+  return lines;
 }
 
 

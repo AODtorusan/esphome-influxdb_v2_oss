@@ -13,6 +13,7 @@ public:
   void set_sensor(text_sensor::TextSensor *sensor) { this->sensor_ = sensor; }
   void set_raw_state(bool val) { this->raw_state_ = val; }
 
+  void setup() override;
   bool sensor_has_state() const override { return this->sensor_->has_state(); }
   std::string sensor_object_id() const override { return this->sensor_->get_object_id(); }
   void to_line(std::string &line) const override;
