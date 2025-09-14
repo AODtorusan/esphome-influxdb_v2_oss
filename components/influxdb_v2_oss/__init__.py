@@ -66,12 +66,12 @@ CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(InfluxDB),
         cv.GenerateID(CONF_HTTP_REQUEST_ID): cv.use_id(HttpRequestComponent),
+        cv.GenerateID(CONF_TIME_ID): cv.use_id(RealTimeClock),
         cv.Required(CONF_URL): cv.url,
         cv.Optional(CONF_ORGANIZATION): cv.string,
         cv.Optional(CONF_TOKEN): cv.string,
         cv.Optional(CONF_BUCKET): cv.string,
         cv.Optional(CONF_MEASUREMENT, default="esphome"): cv.string,
-        cv.Required(CONF_TIME_ID): cv.use_id(RealTimeClock),
         cv.Optional(CONF_TAGS): cv.Schema({valid_identifier: cv.string}),
         cv.Optional(CONF_BACKLOG_MAX_DEPTH, default=10): cv.int_range(min=1, max=200),
         cv.Optional(CONF_BACKLOG_DRAIN_BATCH): cv.int_range(min=1, max=20),

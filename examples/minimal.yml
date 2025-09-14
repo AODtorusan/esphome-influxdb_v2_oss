@@ -40,8 +40,6 @@ influxdb_v2_oss:
   url: http://influxdb.example.com:8086
   organization: example
   token: influxdb-token
-  time_id: _time
-  backlog_max_depth: 60
-  backlog_drain_batch: 10
+  bucket: info
   tags:
     device: ${node_name}
