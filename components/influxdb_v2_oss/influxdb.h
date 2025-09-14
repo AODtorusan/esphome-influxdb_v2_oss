@@ -21,36 +21,44 @@ public:
   std::string data;
 };
 
-class Measurement;
+class Field;
 
 class InfluxDB : public Component {
 public:
   void setup() override;
+  void dump_config() override;
   void loop() override;
   void set_http_request(http_request::HttpRequestComponent *http) { this->http_request_ = http; };
   void set_url(std::string url) { this->url_ = std::move(url); }
   void set_token(std::string token) { this->token_ = std::string("Token ") + token; }
+  void set_measurement(std::string measurement) { this->measurement_ = measurement; }
+  void set_default_name_from_id(bool default_name_from_id) { this->default_name_from_id_ = default_name_from_id; }
+  void set_publish_all(bool publish_all) { this->publish_all_ = publish_all; }
+  void add_tag( const std::string key, const std::string value ) { this->global_tags_.push_back(std::pair(key, value)); }
   void set_clock(time::RealTimeClock *clock) { this->clock_ = clock; }
   void set_backlog_max_depth(uint8_t val) { this->backlog_max_depth_ = val; }
   void set_backlog_drain_batch(uint8_t val) { this->backlog_drain_batch_ = val; }
-  void add_measurement(Measurement *measurement) { this->measurements_.push_back(measurement); }
+  void add_field(Field* field) { this->fields_.push_back(field); }
+  const std::string &get_url() { return this->url_; }
+
+  void queue(const std::string &url, std::string &&data);
 
   float get_setup_priority() const override { return setup_priority::LATE; }
 
-  static void queue_action(const Measurement *measurement);
-  static void queue_batch_action(std::list<const Measurement *> measurements);
-
-  const std::string &get_url() { return this->url_; }
-
 protected:
-  void queue(const std::string &url, std::string &&data);
   bool send_data(const std::string &url, const std::string &data);
+
+  bool publish_all_;
+  bool default_name_from_id_;
+  std::list<std::pair<const std::string, const std::string>> global_tags_;
+  std::string measurement_;
 
   http_request::HttpRequestComponent *http_request_;
   std::string url_;
   std::string token_;
   std::list<http_request::Header> headers_;
-  std::list<Measurement*> measurements_;
+  std::list<Field*> fields_;
+
   time::RealTimeClock *clock_{nullptr};
   std::list<BacklogEntry> backlog_;
   uint8_t backlog_max_depth_{10};

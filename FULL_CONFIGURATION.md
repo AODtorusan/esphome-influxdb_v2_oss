@@ -85,13 +85,6 @@ sensor:
   - id: _uptime
     platform: uptime
     name: ${node_name} Uptime
-    on_value:
-      then:
-        - if:
-            condition:
-              time.has_time:
-            then:
-              - influxdb.queue: _device_info
 
   - id: _wifi_rssi
     platform: wifi_signal
@@ -101,13 +94,7 @@ sensor:
 This section configures two sensors, device uptime and the WiFi RSSI
 (signal strength).
 
-In addition, the configuration triggers publication to InfluxDB each
-time the 'uptime' sensor has a new value (once per second), but only
-if the 'time' component has achieved time synchronization. As noted
-below, this is required for the InfluxDB component to be able to
-generate timestamps, and also for the ability to queue measurements
-for later publication if connectivity to the InfluxDB server is
-interrupted.
+Any time a sensor receives a new value, it is immidiatly queued to be sent to InfluxDB
 
 ```yaml
   - platform: pmsx003
@@ -166,6 +153,7 @@ interrupted.
     temperature:
       id: temperature_c
       name: ${node_friendly_name} Temperature
+      accuracy_decimals: 1
       filters:
         - sliding_window_moving_average:
             window_size: 30
@@ -175,6 +163,7 @@ interrupted.
     platform: copy
     source_id: temperature_c
     unit_of_measurement: "°F"
+    accuracy_decimals: 1
     filters:
       - multiply: 1.8
       - offset: 32.0
@@ -215,11 +204,10 @@ influxdb_v2_oss:
   backlog_drain_batch: 10
   tags:
     device: ${node_name}
-  measurements:
+  sensors:
 ```
 
-This section configures the InfluxDB component itself, but not the
-measurements to be queued (see below for those).
+This section configures the InfluxDB component itself.
 
 First, the basic details required to connect to the InfluxDB server:
 URL, organization, and token.
@@ -243,33 +231,25 @@ added to all measurements queued by the component. In this case a
 tag named `device` will be sent containing the ESPHome `node_name`.
 
 ```yaml
-    - id: _device_info
-      bucket: iot_devices
-      name: info
-      sensors:
-        - sensor_id: _uptime
-          name: uptime
-          format: integer
-        - sensor_id: _wifi_rssi
-          name: rssi
-      binary_sensors:
-        - sensor_id: _wifi_connected
-          name: connected
-      text_sensors:
-        - sensor_id: _wifi_ip_address
-          name: ip_address
+influxdb_v2_oss:
+  # ...
+  sensors:
+    _uptime:
+      name: uptime
+    _wifi_rssi:
+      name: rssi
+    _wifi_connected:
+      name: connected
+    _wifi_ip_address:
+      name: ip_address
 ```
 
-This section configures the first measurement. It has an ID which can
-be supplied to the `influxdb.queue` action to trigger publication, a
-bucket name to receive the measurement, and a name ('info'). The
-measurement will contain values from four sensors (specified by their
-IDs), with names supplied to override the default names ('uptime'
-instead of '_uptime' and 'rssi' instead of '_wifi_rssi', etc.)
-
-One of the sensors is also queued as an integer instead of the
-default floating-point format, sine the unit's uptime is always a
-whole number of seconds.
+This section configures the first set of measurements. The key for
+each entry is the ID of the sensor that is customized. The
+bucket & measurement where these sensors will be published are
+inherited from the top-level configuration. The names supplied are to
+override the default names ('uptime' instead of '_uptime' and 'rssi'
+instead of '_wifi_rssi', etc.)
 
 It may be useful to note that if the WiFi network is not connected,
 the value of `_wifi_connected` will be `false`, but queuing to the
@@ -279,85 +259,41 @@ measurements containing a `false` value will be queued in the backlog
 until the server becomes reachable again.
 
 ```yaml
-    - id: _pm
-      bucket: air_quality
-      name: particulate_matter
-      sensors:
-        - sensor_id: pm_0_3um
-          raw_state: true
-        - sensor_id: pm_1_0
-          raw_state: true
-        - sensor_id: pm_2_5
-          raw_state: true
-        - sensor_id: pm_10_0
-          raw_state: true
-```
+sensor:
+  - platform: sht4x
+    ...
+    temperature:
+      id: temperature_c
+      ...
+      accuracy_decimals: 1
 
-This section configures another measurement, and demonstrates how the
-component can queue the 'raw' state of a numeric (or text)
-sensor. In this case the referenced sensors have
-`sliding_window_moving_average` filters which are used to smooth out
-the data reported to Home Assistant, but the data reported to InfluxDB
-will be the raw data.
+  - id: temperature_f
+    ...
+    accuracy_decimals: 1
 
-```yaml
-    - id: _co2
-      bucket: air_quality
-      name: carbon_dioxide
-      sensors:
-        - sensor_id: co2
-          format: unsigned_integer
-```
-
-This section configures another measurement, and demonstrates how a
-numeric sensor (which has a floating-point value in ESPHome) can be
-queued as an 'unsigned integer' to InfluxDB.
-
-```yaml
-    - id: _temperature_c
-      bucket: air_quality
+influxdb_v2_oss:
+  # ...
+    temperature_c:
       name: temperature
+      bucket: air_quality
+      measurement: temperature
       tags:
         scale: C
-      sensors:
-        - sensor_id: temperature_c
-          name: temperature
-          accuracy_decimals: 1
-
-    - id: _temperature_f
-      bucket: air_quality
+    temperature_f:
       name: temperature
+      bucket: air_quality
+      measurement: temperature
       tags:
         scale: F
-      sensors:
-        - sensor_id: temperature_f
-          name: temperature
-          accuracy_decimals: 1
 ```
 
 This section configures two measurements, which have different IDs but
-the same `name`, so they will be combined by InfluxDB into a single
-measurement when their timestamps match. Each measurement has one
-field, and again they have the same name, but since there are
-measurement-level tags applied these fields become a pair that can be
-queried based on their tag values depending on whether Celsius or
-Fahrenheit values are desired in the query result.
+the same `name`. This will result in two line entries for the same
+bucket/measurement/value but a different tagset (when their timestamps
+match). In InfluxDB these will be combined into a single measurement.
+The result is that InfluxDB can be queried based on their tag values
+depending on whether Celsius or Fahrenheit values are desired in the
+query result.
 
 This section also demonstrates how the floating-point values can be
 rounded to a specified number of decimal places.
-
-```yaml
-interval:
-  - interval: 30s
-    then:
-      - influxdb.queue_batch:
-          - _pm
-          - _co2
-          - _temperature_c
-          - _temperature_f
-```
-
-The final section sets up an `interval` timer to queue some of the
-measurements every 30 seconds. The `queue_batch` action is used
-to ensure that all of the referenced measurements are queued with
-identical timestamps.

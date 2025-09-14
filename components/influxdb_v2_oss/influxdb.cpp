@@ -1,5 +1,8 @@
 #include "influxdb.h"
-#include "measurement.h"
+
+#include "binary_sensor_field.h"
+#include "numeric_sensor_field.h"
+#include "text_sensor_field.h"
 
 namespace esphome {
 namespace influxdb {
@@ -25,9 +28,61 @@ void InfluxDB::setup() {
     this->headers_.push_back(header);
   }
 
-  for (auto measurement : this->measurements_) {
-    measurement->setup();
+  if (this->publish_all_) {
+#ifdef USE_BINARY_SENSOR
+    for (auto *obj : App.get_binary_sensors()) {
+      if (!obj->is_internal() && std::none_of(this->fields_.begin(), this->fields_.end(), [&obj](Field* o) { return o->sensor_object_id() == obj->get_object_id(); })) {
+        BinarySensorField* field = new BinarySensorField();
+        field->set_sensor(obj);
+        field->set_measurement( this->measurement_ );
+        obj->add_on_state_callback([this, field](bool state) {
+          this->queue( this->url_, std::move(field->to_line()) );
+        });
+        this->add_field( field );
+      }
+    }
+#endif
+#ifdef USE_SENSOR
+    for (auto *obj : App.get_sensors()) {
+      if (!obj->is_internal() && std::none_of(this->fields_.begin(), this->fields_.end(), [&obj](Field* o) { return o->sensor_object_id() == obj->get_object_id(); })) {
+        NumericSensorField* field = new NumericSensorField();
+        field->set_sensor(obj);
+        field->set_measurement( this->measurement_ );
+        obj->add_on_state_callback([this, field](float state) {
+          this->queue( this->url_, std::move(field->to_line()) );
+        });
+        this->add_field( field );
+      }
+    }
+#endif
+#ifdef USE_TEXT_SENSOR
+    for (auto *obj : App.get_text_sensors()) {
+      if (!obj->is_internal() && std::none_of(this->fields_.begin(), this->fields_.end(), [&obj](Field* o) { return o->sensor_object_id() == obj->get_object_id(); })) {
+        TextSensorField* field = new TextSensorField();
+        field->set_sensor(obj);
+        field->set_measurement( this->measurement_ );
+        obj->add_on_state_callback([this, field](std::string state) {
+          this->queue( this->url_, std::move(field->to_line()) );
+        });
+        this->add_field( field );
+      }
+    }
+#endif
   }
+
+  for (auto field : this->fields_) {
+    field->set_clock( this->clock_ );
+    for (auto tag : this->global_tags_)
+      field->add_tag( tag.first, tag.second );
+    field->setup( this->default_name_from_id_ );
+  }
+}
+
+void InfluxDB::dump_config() {
+  ESP_LOGCONFIG(TAG, "InfluxDB component");
+  ESP_LOGCONFIG(TAG, "  Fields:");
+  for (auto field : this->fields_)
+    ESP_LOGCONFIG(TAG, "    %s", field->get_field_name().c_str());
 }
 
 void InfluxDB::loop() {
@@ -50,48 +105,8 @@ void InfluxDB::loop() {
   this->disable_loop();
 }
 
-void InfluxDB::queue_action(const Measurement *measurement) {
-  std::string timestamp;
-  auto db = measurement->get_parent();
-
-  if (db->clock_ != nullptr) {
-    auto time = db->clock_->now();
-    timestamp = str_sprintf(" %jd", (intmax_t) time.timestamp);
-  }
-
-  db->queue(measurement->get_url(), measurement->to_line(timestamp));
-}
-
-void InfluxDB::queue_batch_action(std::list<const Measurement *> measurements) {
-  std::string timestamp;
-  auto db = measurements.front()->get_parent();
-  const std::string& url = measurements.front()->get_url();
-  std::string data;
-
-  if (db->clock_ != nullptr) {
-    auto time = db->clock_->now();
-    timestamp = str_sprintf(" %jd", (intmax_t) time.timestamp);
-  }
-
-  for (auto measurement : measurements) {
-    if (measurement->get_parent() != db) {
-      ESP_LOGE(TAG, "Batch cannot include measurements for multiple databases.");
-      continue;
-    }
-
-    if (measurement->get_url() != url) {
-      ESP_LOGE(TAG, "Batch cannot include measurements for multiple buckets.");
-      continue;
-    }
-
-    data += measurement->to_line(timestamp);
-  }
-
-  db->queue(url, std::move(data));
-}
-
 void InfluxDB::queue(const std::string &url, std::string &&data) {
-  ESP_LOGD(TAG, "Adding data (%d) into the InfluxDB queue for %s", data.size(), url.c_str());
+  ESP_LOGD(TAG, "Adding data (%d) into the InfluxDB queue for %s: \n%s", data.size(), url.c_str(), data.c_str());
   if (this->backlog_.size() == this->backlog_max_depth_) {
     ESP_LOGW(TAG, "Backlog is full, dropping oldest entries.");
     this->backlog_.pop_front();

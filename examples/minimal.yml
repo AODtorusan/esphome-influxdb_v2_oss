@@ -23,20 +23,13 @@ time:
     timezone: EST5EDT,M3.2.0,M11.1.0
 
 sensor:
-  - id: _uptime
-    platform: uptime
-    name: ${node_name} Uptime
-    on_value:
-      then:
-        - if:
-            condition:
-              time.has_time:
-            then:
-              - influxdb.queue: _device_info
+  - platform: uptime
+    name: Uptime
+    accuracy_decimals: 2
 
-  - id: _wifi_rssi
-    platform: wifi_signal
-    name: ${node_name} WiFi Signal
+  - platform: wifi_signal
+    name: WiFi Signal
+    accuracy_decimals: 1
 
 http_request:
   useragent: esphome/influxdb
@@ -52,12 +45,3 @@ influxdb_v2_oss:
   backlog_drain_batch: 10
   tags:
     device: ${node_name}
-  measurements:
-    - id: _device_info
-      bucket: iot_devices
-      name: info
-      sensors:
-        - sensor_id: _uptime
-          name: uptime
-        - sensor_id: _wifi_rssi
-          name: rssi

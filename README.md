@@ -43,18 +43,8 @@ When sensors are added to a `measurement` as `fields`, the component
 will use the sensor's ID as the field name by default; the
 configuration can provide an alternative name to be used instead.
 
-Numeric sensors default to 'float' format when published, but the
-configuration can override the type to 'integer' or 'unsigned integer'
-if desired.
-
-### Raw or Filtered Sensor Values
-
-When a `field` is published, its value can be either the raw sensor
-value, or the filtered value if the sensor configuration includes
-filters. This allows the Home Assistant dashboards to include values
-that have been transformed for display, but InfluxDB to receive the
-raw values, without having to use the `copy` component to make both
-values available.
+Numeric sensors default to `float` format when published, the precision
+is based on the `accuracy_decimals` specified on the sensor.
 
 ## Comparison to Home Assistant's InfluxDB integration
 
@@ -164,13 +154,6 @@ sensor:
   - id: _uptime
     platform: uptime
     name: ${node_name} Uptime
-    on_value:
-      then:
-        - if:
-            condition:
-              time.has_time:
-            then:
-              - influxdb.publish: _device_info
 
   - id: _wifi_rssi
     platform: wifi_signal
@@ -180,13 +163,7 @@ sensor:
 This section configures two sensors, device uptime and the WiFi RSSI
 (signal strength).
 
-In addition, the configuration triggers publication to InfluxDB each
-time the 'uptime' sensor has a new value (once per second), but only
-if the 'time' component has achieved time synchronization. As noted
-below, this is required for the InfluxDB component to be able to
-generate timestamps, and also for the ability to queue measurements
-for later publication if connectivity to the InfluxDB server is
-interrupted.
+Any time a sensor receives a new value, it is immidiatly queued to be sent to InfluxDB
 
 ```yaml
 http_request:
@@ -205,17 +182,15 @@ influxdb_v2_oss:
   token: influxdb-token
   backlog_max_depth: 60
   backlog_drain_batch: 10
+  bucket: iot_devices
+  measurement: info
   tags:
     device: ${node_name}
-  measurements:
-    - id: _device_info
-      bucket: iot_devices
-      name: info
-      sensors:
-        - sensor_id: _uptime
-          name: uptime
-        - sensor_id: _wifi_rssi
-          name: rssi
+  #sensors:
+  #  _uptime:
+  #    name: uptime
+  #  _wifi_rssi:
+  #    name: rssi
 ```
 
 This final section configures the InfluxDB component itself.
@@ -236,12 +211,15 @@ The 'tags' section configures tags (keys and values) which will be
 added to all measurements published by the component. In this case a
 tag named `device` will be sent containing the ESPHome `node_name`.
 
-Finally a single measurement is configured. It has an ID which can be
-supplied to the `influxdb.publish` action to trigger publication, a
-bucket name to receive the measurement, and a name ('info'). The
-measurement will contain values from two sensors (specified by their
-IDs), with names supplied to override the default names ('uptime'
-instead of '_uptime' and 'rssi' instead of '_wifi_rssi').
+Finally (optionally) any customization for the sensors to be published
+can be made. The key under sensors is the ID of the sensor to customize.
+Here you can override the name of the sensor, wether to ignore it, the
+measurement where the sensor values should be written and any additional
+tags the sensor value should have.
+
+By default all sensors defined are pushed to the top-level measurement.
+The default name of the sensor is based on the ID (or name) of the
+underlaying sensor.
 
 ### Full Featured
 

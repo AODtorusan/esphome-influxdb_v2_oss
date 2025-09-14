@@ -1,16 +1,9 @@
-from esphome import automation
-from esphome.core import Lambda
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.const import (
-    CONF_ACCURACY_DECIMALS,
-    CONF_BINARY_SENSORS,
-    CONF_FORMAT,
     CONF_ID,
     CONF_NAME,
     CONF_SENSORS,
-    CONF_SENSOR_ID,
-    CONF_TEXT_SENSORS,
     CONF_TIME_ID,
     CONF_URL,
 )
@@ -19,6 +12,8 @@ from esphome.components.http_request import (
 )
 from esphome.components.time import RealTimeClock
 from esphome.components import binary_sensor, sensor, text_sensor
+from esphome.cpp_types import EntityBase
+from esphome.cpp_generator import MockObj, MockObjClass
 
 CODEOWNERS = ["@kpfleming"]
 
@@ -26,27 +21,22 @@ CONF_BACKLOG_DRAIN_BATCH = "backlog_drain_batch"
 CONF_BACKLOG_MAX_DEPTH = "backlog_max_depth"
 CONF_BUCKET = "bucket"
 CONF_HTTP_REQUEST_ID = "http_request_id"
-CONF_MEASUREMENTS = "measurements"
-CONF_MEASUREMENT_ID = "measurement_id"
+CONF_MEASUREMENT = "measurement"
 CONF_ORGANIZATION = "organization"
-CONF_RAW_STATE = "raw_state"
 CONF_TAGS = "tags"
 CONF_TOKEN = "token"
-
-SENSOR_FORMATS = {
-    "float": "f",
-    "integer": "i",
-    "unsigned_integer": "u",
-}
+CONF_PUBLISH_ALL = "publish_all"
+CONF_DEFAULT_NAME_FROM_ID = "default_name_from_id"
+CONF_IGNORE = "ignore"
 
 influxdb_ns = cg.esphome_ns.namespace("influxdb")
 InfluxDB = influxdb_ns.class_("InfluxDB", cg.Component)
 InfluxDBStatics = influxdb_ns.namespace("InfluxDB")
-Measurement = influxdb_ns.class_("Measurement")
+Field = influxdb_ns.class_("Field")
 BinarySensorField = influxdb_ns.class_("BinarySensorField")
 NumericSensorField = influxdb_ns.class_("NumericSensorField")
 TextSensorField = influxdb_ns.class_("TextSensorField")
-
+IgnoredField = influxdb_ns.class_("IgnoredField")
 
 def valid_identifier(value):
     value = cv.string_strict(value)
@@ -60,100 +50,36 @@ def valid_identifier(value):
 def escape_identifier(value):
     return "".join(["\\" + c if c in " ,=\\" else c for c in value])
 
-
-def validate_sensor_config(config):
-    if (CONF_ACCURACY_DECIMALS in config) and (config[CONF_FORMAT] != "float"):
-        raise cv.Invalid(
-            f"{CONF_ACCURACY_DECIMALS} cannot be used with the '{config[CONF_FORMAT]}' format"
-        )
-
-    return config
-
-
-MEASUREMENTS_SCHEMA = cv.All(
-    cv.Schema(
-        {
-            cv.Required(CONF_ID): cv.declare_id(Measurement),
-            cv.Required(CONF_BUCKET): cv.string,
-            cv.Required(CONF_NAME): valid_identifier,
-            cv.Optional(CONF_TAGS): cv.Schema({valid_identifier: cv.string}),
-            cv.Optional(CONF_BINARY_SENSORS): cv.ensure_list(
-                cv.maybe_simple_value(
-                    cv.Schema(
-                        {
-                            cv.GenerateID(): cv.declare_id(BinarySensorField),
-                            cv.Required(CONF_SENSOR_ID): cv.use_id(binary_sensor.BinarySensor),
-                            cv.Optional(CONF_NAME): valid_identifier,
-                        }
-                    ),
-                    key=CONF_SENSOR_ID,
-                )
-            ),
-            cv.Optional(CONF_SENSORS): cv.ensure_list(
-                cv.maybe_simple_value(
-                    cv.Schema(
-                        {
-                            cv.GenerateID(): cv.declare_id(NumericSensorField),
-                            cv.Required(CONF_SENSOR_ID): cv.use_id(sensor.Sensor),
-                            cv.Optional(CONF_NAME): valid_identifier,
-                            cv.Optional(CONF_FORMAT, default="float"): cv.enum(SENSOR_FORMATS),
-                            cv.Optional(CONF_ACCURACY_DECIMALS): cv.positive_not_null_int,
-                            cv.Optional(CONF_RAW_STATE, default=False): cv.boolean,
-                        }
-                    ),
-                    validate_sensor_config,
-                    key=CONF_SENSOR_ID,
-                )
-            ),
-            cv.Optional(CONF_TEXT_SENSORS): cv.ensure_list(
-                cv.maybe_simple_value(
-                    cv.Schema(
-                        {
-                            cv.GenerateID(): cv.declare_id(TextSensorField),
-                            cv.Required(CONF_SENSOR_ID): cv.use_id(text_sensor.TextSensor),
-                            cv.Optional(CONF_NAME): valid_identifier,
-                            cv.Optional(CONF_RAW_STATE, default=False): cv.boolean,
-                        }
-                    ),
-                    key=CONF_SENSOR_ID,
-                )
-            ),
-        }
-    ),
-    cv.has_at_least_one_key(CONF_BINARY_SENSORS, CONF_SENSORS, CONF_TEXT_SENSORS),
+SENSOR_SCHEMA = cv.Schema(
+    {
+        cv.use_id(EntityBase): cv.Schema( {
+            cv.GenerateID(): cv.declare_id(Field),
+            cv.Optional(CONF_IGNORE, default=False): cv.boolean,
+            cv.Optional(CONF_NAME): valid_identifier,
+            cv.Optional(CONF_MEASUREMENT): cv.string,
+            cv.Optional(CONF_TAGS, default={}): cv.Schema({valid_identifier: cv.string}),
+        } )
+    }
 )
 
-
-def validate_config(config):
-    if (CONF_BACKLOG_MAX_DEPTH in config) and (CONF_TIME_ID not in config):
-        raise cv.Invalid(f"{CONF_BACKLOG_MAX_DEPTH} requires a 'time' component.")
-
-    if (CONF_BACKLOG_DRAIN_BATCH in config) and (CONF_BACKLOG_MAX_DEPTH not in config):
-        raise cv.Invalid(
-            f"{CONF_BACKLOG_DRAIN_BATCH} requires {CONF_BACKLOG_MAX_DEPTH} to be set."
-        )
-
-    return config
-
-
-CONFIG_SCHEMA = cv.All(
-    cv.Schema(
-        {
-            cv.GenerateID(): cv.declare_id(InfluxDB),
-            cv.GenerateID(CONF_HTTP_REQUEST_ID): cv.use_id(HttpRequestComponent),
-            cv.Required(CONF_URL): cv.url,
-            cv.Required(CONF_ORGANIZATION): cv.string,
-            cv.Optional(CONF_TOKEN): cv.string,
-            cv.Required(CONF_TIME_ID): cv.use_id(RealTimeClock),
-            cv.Optional(CONF_TAGS): cv.Schema({valid_identifier: cv.string}),
-            cv.Optional(CONF_BACKLOG_MAX_DEPTH, default=10): cv.int_range(min=1, max=200),
-            cv.Optional(CONF_BACKLOG_DRAIN_BATCH): cv.int_range(min=1, max=20),
-            cv.Required(CONF_MEASUREMENTS): cv.ensure_list(MEASUREMENTS_SCHEMA),
-        }
-    ).extend(cv.COMPONENT_SCHEMA),
-    validate_config,
-)
-
+CONFIG_SCHEMA = cv.Schema(
+    {
+        cv.GenerateID(): cv.declare_id(InfluxDB),
+        cv.GenerateID(CONF_HTTP_REQUEST_ID): cv.use_id(HttpRequestComponent),
+        cv.Required(CONF_URL): cv.url,
+        cv.Optional(CONF_ORGANIZATION): cv.string,
+        cv.Optional(CONF_TOKEN): cv.string,
+        cv.Optional(CONF_BUCKET): cv.string,
+        cv.Optional(CONF_MEASUREMENT, default="esphome"): cv.string,
+        cv.Required(CONF_TIME_ID): cv.use_id(RealTimeClock),
+        cv.Optional(CONF_TAGS): cv.Schema({valid_identifier: cv.string}),
+        cv.Optional(CONF_BACKLOG_MAX_DEPTH, default=10): cv.int_range(min=1, max=200),
+        cv.Optional(CONF_BACKLOG_DRAIN_BATCH): cv.int_range(min=1, max=20),
+        cv.Optional(CONF_PUBLISH_ALL, default=True): cv.boolean,
+        cv.Optional(CONF_DEFAULT_NAME_FROM_ID, default=True): cv.boolean,
+        cv.Optional(CONF_SENSORS, default={}): SENSOR_SCHEMA,
+    }
+).extend(cv.COMPONENT_SCHEMA)
 
 async def to_code(config):
     db = cg.new_Pvariable(config[CONF_ID])
@@ -166,9 +92,17 @@ async def to_code(config):
     if url[-1] == "/":
         url = url[0:-1]
 
-    org = config[CONF_ORGANIZATION]
+    url += f"/api/v2/write?precision=s"
+    if org := config.get(CONF_ORGANIZATION):
+        url += "&org=" + org
+    if bucket := config.get(CONF_BUCKET):
+        url += "&bucket=" + bucket
 
-    cg.add(db.set_url(f"{url}/api/v2/write?org={org}&precision=s"))
+    cg.add(db.set_url(f"{url}"))
+    cg.add(db.set_publish_all(config[CONF_PUBLISH_ALL]))
+    default_measurement = config[CONF_MEASUREMENT]
+    cg.add(db.set_measurement(default_measurement))
+    cg.add(db.set_default_name_from_id(config[CONF_DEFAULT_NAME_FROM_ID]))
 
     if token := config.get(CONF_TOKEN):
         cg.add(db.set_token(token))
@@ -182,109 +116,45 @@ async def to_code(config):
         if backlog_drain_batch := config.get(CONF_BACKLOG_DRAIN_BATCH):
             cg.add(db.set_backlog_drain_batch(backlog_drain_batch))
 
-    common_tags = {}
-    if tags := config.get(CONF_TAGS):
-        common_tags = tags
-
-    for measurement in config.get(CONF_MEASUREMENTS):
-        meas = cg.new_Pvariable(measurement[CONF_ID], db)
-
-        bucket = measurement[CONF_BUCKET]
-        cg.add(meas.set_bucket(bucket))
-
-        measurement_tags = common_tags.copy()
-        if tags := measurement.get(CONF_TAGS):
-            measurement_tags |= tags
-
-        cg.add(meas.set_name(escape_identifier(measurement[CONF_NAME])))
-
-        if binary_sensors := measurement.get(CONF_BINARY_SENSORS):
-            for conf in binary_sensors:
-                var = cg.new_Pvariable(conf[CONF_ID])
-                sens = await cg.get_variable(conf[CONF_SENSOR_ID])
-                cg.add(var.set_sensor(sens))
-
-                if name := conf.get(CONF_NAME):
-                    cg.add(var.set_field_name(escape_identifier(name)))
-                # else:
-                #     TODO
-
-                for key, value in measurement_tags.items():
-                    cg.add(var.add_tag(escape_identifier(key), escape_identifier(value)))
-
-                cg.add(meas.add_field(var))
-
-        if sensors := measurement.get(CONF_SENSORS):
-            for conf in sensors:
-                var = cg.new_Pvariable(conf[CONF_ID])
-                sens = await cg.get_variable(conf[CONF_SENSOR_ID])
-                cg.add(var.set_sensor(sens))
-
-                cg.add(var.set_format(conf[CONF_FORMAT]))
-                cg.add(var.set_raw_state(conf[CONF_RAW_STATE]))
-
-                if accuracy := conf.get(CONF_ACCURACY_DECIMALS):
-                    cg.add(var.set_accuracy_decimals(accuracy))
-
-                if name := conf.get(CONF_NAME):
-                    cg.add(var.set_field_name(escape_identifier(name)))
-                # else:
-                #     TODO
-
-                for key, value in measurement_tags.items():
-                    cg.add(var.add_tag(escape_identifier(key), escape_identifier(value)))
-
-                cg.add(meas.add_field(var))
+    global_tags: dict = config.get(CONF_TAGS)
+    if tags := global_tags:
+        for key, value in tags.items():
+            cg.add(db.add_tag(escape_identifier(key), escape_identifier(value)))
 
 
-        if text_sensors := measurement.get(CONF_TEXT_SENSORS):
-            for conf in text_sensors:
-                var = cg.new_Pvariable(conf[CONF_ID])
-                sens = await cg.get_variable(conf[CONF_SENSOR_ID])
-                cg.add(var.set_sensor(sens))
+    for sensor_id, sensor_config in config[CONF_SENSORS].items():
+        sensor_var: MockObj = await cg.get_variable(sensor_id)
+        if sensor_config[CONF_IGNORE]:
+            var = cg.Pvariable(sensor_config[CONF_ID], IgnoredField.new(), IgnoredField)
+            cg.add(db.add_field(var))
+            cg.add(var.set_sensor(sensor_var))
+            cg.add(var.set_field_name( f"{sensor_id} [ignored]" ))
+        else:
+            sensor_var_type: MockObjClass = sensor_var.base.type
 
-                cg.add(var.set_raw_state(conf[CONF_RAW_STATE]))
+            var: MockObj = None
+            if (sensor_var_type.inherits_from( binary_sensor.BinarySensor )):
+                cls = BinarySensorField
+                var = cg.Pvariable(sensor_config[CONF_ID], cls.new(), cls)
+            elif (sensor_var_type.inherits_from( sensor.Sensor )):
+                cls = NumericSensorField
+                var = cg.Pvariable(sensor_config[CONF_ID], cls.new(), cls)
+                cg.add(sensor_var.add_on_state_callback(cg.RawExpression(
+                    f"[](float state) {{ {db}->queue( {config[CONF_ID]}->get_url(), std::move({var}->to_line()) ); }}"
+                )))
 
-                if name := conf.get(CONF_NAME):
-                    cg.add(var.set_field_name(escape_identifier(name)))
-                # else:
-                #     TODO
+            elif (sensor_var_type.inherits_from( text_sensor.TextSensor )):
+                cls = TextSensorField
+                var = cg.Pvariable(sensor_config[CONF_ID], cls.new(), cls)
+            else:
+                raise ValueError(f"Could not determine the proper field type to create for this entity type! '{sensor_var}' of type '{sensor_var_type}'")
 
-                for key, value in measurement_tags.items():
-                    cg.add(var.add_tag(escape_identifier(key), escape_identifier(value)))
+            cg.add(db.add_field(var))
+            cg.add(var.set_sensor(sensor_var))
+            cg.add(var.set_measurement(sensor_config.get( CONF_MEASUREMENT, default_measurement )))
+            if name := sensor_config.get(CONF_NAME):
+                cg.add(var.set_field_name(name))
 
-                cg.add(meas.add_field(var))
-
-
-CONF_INFLUXDB_QUEUE = "influxdb.queue"
-INFLUXDB_QUEUE_ACTION_SCHEMA = automation.maybe_simple_id(
-    {
-        cv.GenerateID(): cv.use_id(Measurement),
-    }
-)
-
-
-@automation.register_action(
-    CONF_INFLUXDB_QUEUE, automation.LambdaAction, INFLUXDB_QUEUE_ACTION_SCHEMA
-)
-async def influxdb_queue_action_to_code(config, action_id, template_arg, args):
-    meas = await cg.get_variable(config[CONF_ID])
-    text = str(cg.statement(InfluxDBStatics.queue_action(meas)))
-    lambda_ = await cg.process_lambda(Lambda(text), args, return_type=cg.void)
-    return cg.new_Pvariable(action_id, template_arg, lambda_)
-
-
-CONF_INFLUXDB_QUEUE_BATCH = "influxdb.queue_batch"
-INFLUXDB_QUEUE_BATCH_ACTION_SCHEMA = cv.ensure_list(cv.use_id(Measurement))
-
-
-@automation.register_action(
-    CONF_INFLUXDB_QUEUE_BATCH,
-    automation.LambdaAction,
-    INFLUXDB_QUEUE_BATCH_ACTION_SCHEMA,
-)
-async def influxdb_queue_batch_action_to_code(config, action_id, template_arg, args):
-    meas = [await cg.get_variable(m) for m in config]
-    text = str(cg.statement(InfluxDBStatics.queue_batch_action(meas)))
-    lambda_ = await cg.process_lambda(Lambda(text), args, return_type=cg.void)
-    return cg.new_Pvariable(action_id, template_arg, lambda_)
+            tags = global_tags.copy() | sensor_config[CONF_TAGS]
+            for key, value in tags.items():
+                cg.add(var.add_tag(escape_identifier(key), escape_identifier(value)))

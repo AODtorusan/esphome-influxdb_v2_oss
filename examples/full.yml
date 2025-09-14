@@ -52,13 +52,6 @@ sensor:
   - id: _uptime
     platform: uptime
     name: ${node_name} Uptime
-    on_value:
-      then:
-        - if:
-            condition:
-              time.has_time:
-            then:
-              - influxdb.queue: _device_info
 
   - id: _wifi_rssi
     platform: wifi_signal
@@ -120,6 +113,7 @@ sensor:
     temperature:
       id: temperature_c
       name: ${node_friendly_name} Temperature
+      accuracy_decimals: 1
       filters:
         - sliding_window_moving_average:
             window_size: 30
@@ -129,6 +123,7 @@ sensor:
     platform: copy
     source_id: temperature_c
     unit_of_measurement: "°F"
+    accuracy_decimals: 1
     filters:
       - multiply: 1.8
       - offset: 32.0
@@ -150,70 +145,46 @@ influxdb_v2_oss:
   time_id: _time
   backlog_max_depth: 60
   backlog_drain_batch: 10
+  bucket: iot_devices
+  measurement: info
   tags:
     device: ${node_name}
-  measurements:
-    - id: _device_info
-      bucket: iot_devices
-      name: info
-      sensors:
-        - sensor_id: _uptime
-          name: uptime
-          format: integer
-        - sensor_id: _wifi_rssi
-          name: rssi
-      binary_sensors:
-        - sensor_id: _wifi_connected
-          name: connected
-      text_sensors:
-        - sensor_id: _wifi_ip_address
-          name: ip_address
+  sensors:
+    _uptime:
+      name: uptime
+    _wifi_rssi:
+      name: rssi
+    _wifi_connected:
+      name: connected
+    _wifi_ip_address:
+      name: ip_address
 
-    - id: _pm
-      bucket: air_quality
-      name: particulate_matter
-      sensors:
-        - sensor_id: pm_0_3um
-          raw_state: true
-        - sensor_id: pm_1_0
-          raw_state: true
-        - sensor_id: pm_2_5
-          raw_state: true
-        - sensor_id: pm_10_0
-          raw_state: true
+    pm_0_3um:
+      #bucket: air_quality
+      measurement: particulate_matter
+    pm_1_0:
+      #bucket: air_quality
+      measurement: particulate_matter
+    pm_2_5:
+      #bucket: air_quality
+      measurement: particulate_matter
+    pm_10_0:
+      #bucket: air_quality
+      measurement: particulate_matter
 
-    - id: _co2
-      bucket: air_quality
-      name: carbon_dioxide
-      sensors:
-        - sensor_id: co2
-          format: unsigned_integer
+    co2:
+      #bucket: air_quality
+      measurement: carbon_dioxide
 
-    - id: _temperature_c
-      bucket: air_quality
+    temperature_c:
       name: temperature
+      #bucket: air_quality
+      measurement: temperature
       tags:
         scale: C
-      sensors:
-        - sensor_id: temperature_c
-          name: temperature
-          accuracy_decimals: 1
 
-    - id: _temperature_f
-      bucket: air_quality
+    temperature_f:
       name: temperature
+      #bucket: air_quality
       tags:
         scale: F
-      sensors:
-        - sensor_id: temperature_f
-          name: temperature
-          accuracy_decimals: 1
-
-interval:
-  - interval: 30s
-    then:
-      - influxdb.queue_batch:
-          - _pm
-          - _co2
-          - _temperature_c
-          - _temperature_f
