@@ -168,8 +168,6 @@ Any time a sensor receives a new value, it is immidiatly queued to be sent to In
 ```yaml
 http_request:
   useragent: esphome/influxdb
-  timeout: 15s
-  watchdog_timeout: 15s
 ```
 
 This section configures the `http_request` component, which is used by

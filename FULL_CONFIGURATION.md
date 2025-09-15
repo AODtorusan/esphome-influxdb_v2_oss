@@ -188,7 +188,7 @@ address of the unit.
 http_request:
   useragent: esphome/influxdb
   timeout: 15s
-  watchdog_timeout: 15s
+  watchdog_timeout: 16s
 ```
 
 This section configures the `http_request` component, which is used by

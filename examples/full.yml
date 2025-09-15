@@ -136,7 +136,7 @@ text_sensor:
 http_request:
   useragent: esphome/influxdb
   timeout: 15s
-  watchdog_timeout: 15s
+  watchdog_timeout: 16s
 
 influxdb_v2_oss:
   url: http://influxdb.example.com:8086

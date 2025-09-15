@@ -87,7 +87,7 @@ void InfluxDB::dump_config() {
 
 void InfluxDB::loop() {
   if (!this->backlog_.empty()) {
-    ESP_LOGD(TAG, "Sending InfluxDB lines to server");
+    ESP_LOGD(TAG, "Sending InfluxDB lines to server (queue size: %d)", this->backlog_.size());
     uint8_t item_count = 0;
     do {
       const auto &m = this->backlog_.front();
@@ -101,8 +101,9 @@ void InfluxDB::loop() {
       }
     } while (!this->backlog_.empty() && (item_count < this->backlog_drain_batch_));
     ESP_LOGD(TAG, "Drained %d items from backlog", item_count);
+  } else {
+    this->disable_loop();
   }
-  this->disable_loop();
 }
 
 void InfluxDB::queue(const std::string &url, std::string &&data) {
