@@ -1,5 +1,6 @@
 #include "influxdb.h"
 
+#include "backlog_entry.h"
 #include "binary_sensor_field.h"
 #include "numeric_sensor_field.h"
 #include "text_sensor_field.h"
@@ -36,7 +37,7 @@ void InfluxDB::setup() {
         field->set_sensor(obj);
         field->set_measurement( this->measurement_ );
         obj->add_on_state_callback([this, field](bool state) {
-          this->queue( this->url_, std::move(field->to_line()) );
+          this->queue( std::move(field->to_entry( this->url_ )) );
         });
         this->add_field( field );
       }
@@ -49,7 +50,7 @@ void InfluxDB::setup() {
         field->set_sensor(obj);
         field->set_measurement( this->measurement_ );
         obj->add_on_state_callback([this, field](float state) {
-          this->queue( this->url_, std::move(field->to_line()) );
+          this->queue( std::move(field->to_entry( this->url_ )) );
         });
         this->add_field( field );
       }
@@ -62,7 +63,7 @@ void InfluxDB::setup() {
         field->set_sensor(obj);
         field->set_measurement( this->measurement_ );
         obj->add_on_state_callback([this, field](std::string state) {
-          this->queue( this->url_, std::move(field->to_line()) );
+          this->queue( std::move(field->to_entry( this->url_ )) );
         });
         this->add_field( field );
       }
@@ -90,12 +91,32 @@ void InfluxDB::loop() {
     ESP_LOGD(TAG, "Sending InfluxDB lines to server (queue size: %d)", this->backlog_.size());
     uint8_t item_count = 0;
     do {
-      const auto &m = this->backlog_.front();
+      auto& m = this->backlog_.front();
 
-      auto success = this->send_data(m.url, m.data);
+      // Find all queued messages that go to the same url
+      std::list<std::list<BacklogEntry>::iterator> active;
+      size_t len = 0;
+      uint_fast8_t idx;
+      for (std::list<BacklogEntry>::iterator it = this->backlog_.begin(); it != this->backlog_.end(); ++it) {
+        if (it->url == it->url && active.size() < this->backlog_drain_batch_) {
+          active.push_back(it);
+          len += it->length;
+        }
+        idx++;
+      }
+
+      std::string body;
+      ESP_LOGD(TAG, "Reserving memory for influxdb POST body: %d b", len);
+      body.reserve(len);
+      for (auto& item : active)
+        item->append( body );
+      bool success = this->send_data(m.url, std::move(body));
+
       if (success) {
-        this->backlog_.pop_front();
-        item_count++;
+        for (auto& item : active) {
+          item_count++;
+          this->backlog_.erase(item);
+        }
       } else {
         break;
       }
@@ -106,28 +127,32 @@ void InfluxDB::loop() {
   }
 }
 
-void InfluxDB::queue(const std::string &url, std::string &&data) {
-  ESP_LOGD(TAG, "Adding data (%d) into the InfluxDB queue for %s: \n%s", data.size(), url.c_str(), data.c_str());
+void InfluxDB::queue(BacklogEntry&& data) {
+  if (data.timestamp < 946681200 /* J2000, check is we have an absolute time */) {
+    ESP_LOGW(TAG, "Cannot submit influxdb metrics for %s, clock is not ready!", data.field->get_field_name().c_str());
+    return;
+  }
+
+  ESP_LOGD(TAG, "Adding data (%d) into the InfluxDB queue for %s", data.length, data.url.c_str());
   if (this->backlog_.size() == this->backlog_max_depth_) {
     ESP_LOGW(TAG, "Backlog is full, dropping oldest entries.");
     this->backlog_.pop_front();
   }
-  this->backlog_.emplace_back(url, std::move(data));
+  this->backlog_.push_back(data);
   this->enable_loop();
 }
 
 bool InfluxDB::send_data(const std::string &url, const std::string &data) {
   uint8_t buf[32];
-
   auto response = this->http_request_->post(url, data, this->headers_);
 
   if (response == nullptr) {
-    ESP_LOGW(TAG, "Error sending metrics to %s", data.c_str());
+    ESP_LOGW(TAG, "Error sending metrics to %s", url.c_str());
     return false;
   }
   auto status_code = response->status_code;
   if (status_code != 204) {
-    ESP_LOGW(TAG, "Error sending metrics to %s: HTTP %d", data.c_str(), status_code);
+    ESP_LOGW(TAG, "Error sending metrics to %s: HTTP %d", url.c_str(), status_code);
     return false;
   }
 

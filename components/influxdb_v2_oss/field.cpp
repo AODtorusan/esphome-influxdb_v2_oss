@@ -1,6 +1,7 @@
 
 #include "field.h"
 #include "influxdb.h"
+#include "backlog_entry.h"
 
 namespace esphome {
 namespace influxdb {
@@ -16,33 +17,14 @@ void Field::setup(bool default_name_from_id) {
   this->do_setup();
 }
 
-void Field::add_tag(const std::string& tag, const std::string& value) {
-    if (this->tags_.size() > 0)
-        this->tags_ += ',';
-    this->tags_ += tag;
-    this->tags_ += '=';
-    this->tags_ += value;
+void Field::add_tag(const std::string& tag, const std::string &value) {
+  this->tags_.emplace_back( tag, value );
 }
 
-std::string Field::to_line() {
-  std::string line;
+BacklogEntry Field::to_entry( const std::string& url ) {
   time_t now = this->clock_->timestamp_now();
-  if (now > 946681200 /* J2000, check is we have an absolute time */) {
-    line.reserve( tags_.size() * 16 + 32 );
-    line += this->measurement_;
-    line += ',';
-    line += this->tags_;
-    line += ' ';
-    line += this->get_field_name();
-    line += '=';
-    this->to_value( line );
-    line += ' ';
-    line += std::to_string( now );
-    line += '\n';
-  } else {
-    ESP_LOGW(TAG, "Cannot submit influxdb metrics for %s, clock is not ready!", this->get_field_name().c_str());
-  }
-  return line;
+  std::string value = this->to_value();
+  return BacklogEntry(url, this, std::move(value), now);
 }
 
 }  // namespace influxdb

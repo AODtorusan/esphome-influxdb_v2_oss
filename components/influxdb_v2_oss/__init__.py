@@ -73,8 +73,8 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_BUCKET): cv.string,
         cv.Optional(CONF_MEASUREMENT, default="esphome"): cv.string,
         cv.Optional(CONF_TAGS): cv.Schema({valid_identifier: cv.string}),
-        cv.Optional(CONF_BACKLOG_MAX_DEPTH, default=10): cv.int_range(min=1, max=200),
-        cv.Optional(CONF_BACKLOG_DRAIN_BATCH): cv.int_range(min=1, max=20),
+        cv.Optional(CONF_BACKLOG_MAX_DEPTH, default=100): cv.int_range(min=1, max=200),
+        cv.Optional(CONF_BACKLOG_DRAIN_BATCH, default=5): cv.int_range(min=1, max=20),
         cv.Optional(CONF_PUBLISH_ALL, default=True): cv.boolean,
         cv.Optional(CONF_DEFAULT_NAME_FROM_ID, default=True): cv.boolean,
         cv.Optional(CONF_SENSORS, default={}): SENSOR_SCHEMA,
@@ -140,7 +140,7 @@ async def to_code(config):
                 cls = NumericSensorField
                 var = cg.Pvariable(sensor_config[CONF_ID], cls.new(), cls)
                 cg.add(sensor_var.add_on_state_callback(cg.RawExpression(
-                    f"[](float state) {{ {db}->queue( {config[CONF_ID]}->get_url(), std::move({var}->to_line()) ); }}"
+                    f"[](float state) {{ {db}->queue( std::move({var}->to_entry( {config[CONF_ID]}->get_url() )) ); }}"
                 )))
 
             elif (sensor_var_type.inherits_from( text_sensor.TextSensor )):

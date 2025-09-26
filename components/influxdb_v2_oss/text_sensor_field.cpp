@@ -12,10 +12,12 @@ void TextSensorField::do_setup() {
   }
 }
 
-void TextSensorField::to_value(std::string &line) const {
-  line += '"';
-  line += this->sensor_->get_state();
-  line += '"';
+std::string TextSensorField::to_value() const {
+  std::string value;
+  value += '"';
+  value += this->sensor_->get_state();
+  value += '"';
+  return value;
 }
 
 #endif

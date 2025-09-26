@@ -7,21 +7,15 @@
 
 #include <list>
 #include <vector>
+#include <unordered_map>
 
 namespace esphome {
 namespace influxdb {
 
 static const char *const TAG = "influxdb_v2_oss";
 
-class BacklogEntry {
-public:
-  BacklogEntry(const std::string &url, std::string &&data) : url(url), data(std::move(data)) {}
-
-  const std::string &url;
-  std::string data;
-};
-
 class Field;
+class BacklogEntry;
 
 class InfluxDB : public Component {
 public:
@@ -41,7 +35,7 @@ public:
   void add_field(Field* field) { this->fields_.push_back(field); }
   const std::string &get_url() { return this->url_; }
 
-  void queue(const std::string &url, std::string &&data);
+  void queue(BacklogEntry&& entry);
 
   float get_setup_priority() const override { return setup_priority::LATE; }
 
@@ -61,8 +55,8 @@ protected:
 
   time::RealTimeClock *clock_{nullptr};
   std::list<BacklogEntry> backlog_;
-  uint8_t backlog_max_depth_{10};
-  uint8_t backlog_drain_batch_{1};
+  uint8_t backlog_max_depth_{20};
+  uint8_t backlog_drain_batch_{5};
 };
 
 }  // namespace influxdb

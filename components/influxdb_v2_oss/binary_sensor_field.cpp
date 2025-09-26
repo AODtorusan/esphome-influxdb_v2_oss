@@ -12,8 +12,8 @@ void BinarySensorField::do_setup() {
   }
 }
 
-void BinarySensorField::to_value(std::string &line) const {
-  line += (this->sensor_->state ? 'T' : 'F');
+std::string BinarySensorField::to_value() const {
+  return std::string(this->sensor_->state ? "T" : "F");
 }
 
 #endif
