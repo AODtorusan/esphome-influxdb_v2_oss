@@ -6,11 +6,7 @@ namespace influxdb {
 
 #ifdef USE_TEXT_SENSOR
 
-void TextSensorField::do_setup() {
-  if (!this->sensor_->get_device_class().empty()) {
-    this->add_tag("device_class", this->sensor_->get_device_class());
-  }
-}
+void TextSensorField::do_setup() {}
 
 std::string TextSensorField::to_value() const {
   std::string value;

@@ -7,18 +7,11 @@ namespace influxdb {
 
 #ifdef USE_SENSOR
 
-const std::string STR_DEVICE_CLASS("device_class");
-const std::string STR_UNIT("unit");
-const std::string STR_STATE_CLASS("state_class");
-
 void NumericSensorField::do_setup() {
-  if (!this->sensor_->get_device_class().empty()) {
-    this->add_tag(STR_DEVICE_CLASS, this->sensor_->get_device_class());
-  }
   if (!this->sensor_->get_unit_of_measurement().empty()) {
-    this->add_tag(STR_UNIT, this->sensor_->get_unit_of_measurement());
+    this->add_tag(STR_TAG_UNIT, this->sensor_->get_unit_of_measurement());
   }
-  this->add_tag(STR_STATE_CLASS, state_class_to_string(this->sensor_->get_state_class()));
+  this->add_tag(STR_TAG_STATE_CLASS, state_class_to_string(this->sensor_->get_state_class()));
 }
 
 std::string NumericSensorField::to_value() const {

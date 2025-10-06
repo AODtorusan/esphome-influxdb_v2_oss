@@ -37,7 +37,7 @@ void BacklogEntry::append( std::string& lines ) {
   lines += ' ';
   lines += std::to_string( timestamp );
   lines += '\n';
-  ESP_LOGD(TAG, "APPENDED=%s", lines.c_str()+l0);
+  ESP_LOGV(TAG, "Serialized entry to: %s", lines.c_str()+l0);
 }
 
 }  // namespace influxdb

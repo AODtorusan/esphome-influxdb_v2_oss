@@ -11,6 +11,12 @@
 namespace esphome {
 namespace influxdb {
 
+const std::string STR_TAG_DEVICE_CLASS("device_class");
+const std::string STR_TAG_UNIT("unit");
+const std::string STR_TAG_STATE_CLASS("state_class");
+const std::string STR_TAG_SENSOR_ID("sensor_id");
+const std::string STR_TAG_SENSOR_NAME("sensor_name");
+
 class Field {
 public:
   void set_clock(time::RealTimeClock *clock) { this->clock_ = clock; }
@@ -25,13 +31,13 @@ public:
 
   BacklogEntry to_entry( const std::string& url );
 
-  //std::string to_line();
-  void setup(bool default_name_from_id);
+  void setup(DefaultNamePolicy default_name_policy);
 
   virtual void do_setup() = 0;
   virtual bool sensor_has_state() const = 0;
   virtual std::string sensor_object_id() const = 0;
   virtual std::string sensor_object_name() const = 0;
+  virtual std::string sensor_object_device_class() const = 0;
   virtual std::string to_value() const = 0;
 
 protected:
@@ -49,6 +55,7 @@ class IgnoredField: public Field {
   bool sensor_has_state() const override { return false; };
   std::string sensor_object_id() const override { return entity->get_object_id(); }
   std::string sensor_object_name() const override { return entity->get_name(); }
+  std::string sensor_object_device_class() const override { return "none"; }
   std::string to_value() const override { return std::string(); }
 
 protected:

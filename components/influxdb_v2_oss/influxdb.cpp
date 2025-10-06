@@ -75,7 +75,7 @@ void InfluxDB::setup() {
     field->set_clock( this->clock_ );
     for (auto tag : this->global_tags_)
       field->add_tag( tag.first, tag.second );
-    field->setup( this->default_name_from_id_ );
+    field->setup( this->default_name_policy );
   }
 }
 

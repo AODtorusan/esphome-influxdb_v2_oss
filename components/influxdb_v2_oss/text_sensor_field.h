@@ -16,6 +16,7 @@ public:
   bool sensor_has_state() const override { return this->sensor_->has_state(); }
   std::string sensor_object_id() const override { return this->sensor_->get_object_id(); }
   std::string sensor_object_name() const override { return this->sensor_->get_name(); }
+  std::string sensor_object_device_class() const override { return this->sensor_->get_device_class(); }
   std::string to_value() const override;
 
 protected:
