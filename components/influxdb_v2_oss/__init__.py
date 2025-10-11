@@ -53,10 +53,6 @@ def valid_identifier(value):
 
     return value
 
-
-def escape_identifier(value):
-    return "".join(["\\" + c if c in " ,=\\" else c for c in value])
-
 SENSOR_SCHEMA = cv.Schema(
     {
         cv.use_id(EntityBase): cv.Schema( {
@@ -126,7 +122,7 @@ async def to_code(config):
     global_tags: dict = config.get(CONF_TAGS)
     if tags := global_tags:
         for key, value in tags.items():
-            cg.add(db.add_tag(escape_identifier(key), escape_identifier(value)))
+            cg.add(db.add_tag(key, value))
 
 
     for sensor_id, sensor_config in config[CONF_SENSORS].items():
@@ -164,4 +160,4 @@ async def to_code(config):
 
             tags = global_tags.copy() | sensor_config[CONF_TAGS]
             for key, value in tags.items():
-                cg.add(var.add_tag(escape_identifier(key), escape_identifier(value)))
+                cg.add(var.add_tag(key, value))

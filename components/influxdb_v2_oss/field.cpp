@@ -1,4 +1,7 @@
 
+#include <string>
+#include <regex>
+
 #include "field.h"
 #include "influxdb.h"
 #include "backlog_entry.h"
@@ -28,14 +31,16 @@ void Field::setup(DefaultNamePolicy default_name_policy) {
     }
   }
   this->add_tag(STR_TAG_SENSOR_ID, this->sensor_object_id());
-  this->add_tag(STR_TAG_SENSOR_NAME,  '"'+this->sensor_object_name()+'"');
+  this->add_tag(STR_TAG_SENSOR_NAME,  this->sensor_object_name());
   if (!device_class.empty())
     this->add_tag(STR_TAG_DEVICE_CLASS, device_class);
   this->do_setup();
 }
 
 void Field::add_tag(const std::string& tag, const std::string &value) {
-  this->tags_.emplace_back( tag, value );
+  std::string escaped_tag = std::regex_replace(tag, std::regex("([, =\\\\])"), "\\$1");
+  std::string escaped_value = std::regex_replace(value, std::regex("([, =\\\\])"), "\\$1");
+  this->tags_.emplace_back( escaped_tag, escaped_value );
 }
 
 BacklogEntry Field::to_entry( const std::string& url ) {
