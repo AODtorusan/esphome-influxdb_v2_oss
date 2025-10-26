@@ -11,7 +11,7 @@ void NumericSensorField::do_setup() {
   if (!this->sensor_->get_unit_of_measurement().empty()) {
     this->add_tag(STR_TAG_UNIT, this->sensor_->get_unit_of_measurement());
   }
-  this->add_tag(STR_TAG_STATE_CLASS, state_class_to_string(this->sensor_->get_state_class()));
+  this->add_tag(STR_TAG_STATE_CLASS, LOG_STR_ARG(state_class_to_string(this->sensor_->get_state_class())));
 }
 
 std::string NumericSensorField::to_value() const {
