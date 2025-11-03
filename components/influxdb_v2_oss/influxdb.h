@@ -34,6 +34,10 @@ public:
   void set_measurement(std::string measurement) { this->measurement_ = measurement; }
   void set_default_name_policy(DefaultNamePolicy default_name_policy) { this->default_name_policy = default_name_policy; }
   void set_publish_all(bool publish_all) { this->publish_all_ = publish_all; }
+  void set_publish_all_numeric(bool publish_all_numeric) { this->publish_all_numeric_ = publish_all_numeric; }
+  void set_publish_all_binary(bool publish_all_binary) { this->publish_all_binary_ = publish_all_binary; }
+  void set_publish_all_text(bool publish_all_text) { this->publish_all_text_ = publish_all_text; }
+
   void add_tag( const std::string key, const std::string value ) { this->global_tags_.push_back(std::pair(key, value)); }
   void set_clock(time::RealTimeClock *clock) { this->clock_ = clock; }
   void set_backlog_max_depth(uint8_t val) { this->backlog_max_depth_ = val; }
@@ -49,6 +53,9 @@ protected:
   bool send_data(const std::string &url, const std::string &data);
 
   bool publish_all_;
+  bool publish_all_numeric_;
+  bool publish_all_binary_;
+  bool publish_all_text_;
   DefaultNamePolicy default_name_policy;
   std::list<std::pair<const std::string, const std::string>> global_tags_;
   std::string measurement_;

@@ -26,6 +26,9 @@ CONF_ORGANIZATION = "organization"
 CONF_TAGS = "tags"
 CONF_TOKEN = "token"
 CONF_PUBLISH_ALL = "publish_all"
+CONF_PUBLISH_ALL_NUMERIC = "publish_all_numeric"
+CONF_PUBLISH_ALL_BINARY  = "publish_all_binary"
+CONF_PUBLISH_ALL_TEXT    = "publish_all_text"
 CONF_DEFAULT_NAME_POLICY = "default_name_policy"
 CONF_IGNORE = "ignore"
 
@@ -79,6 +82,9 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_BACKLOG_MAX_DEPTH, default=100): cv.int_range(min=1, max=200),
         cv.Optional(CONF_BACKLOG_DRAIN_BATCH, default=5): cv.int_range(min=1, max=20),
         cv.Optional(CONF_PUBLISH_ALL, default=True): cv.boolean,
+        cv.Optional(CONF_PUBLISH_ALL_NUMERIC, default=False): cv.boolean,
+        cv.Optional(CONF_PUBLISH_ALL_BINARY, default=False): cv.boolean,
+        cv.Optional(CONF_PUBLISH_ALL_TEXT, default=False): cv.boolean,
         cv.Optional(CONF_DEFAULT_NAME_POLICY, default="name"): cv.enum( DEFAULT_NAME_POLICIES ),
         cv.Optional(CONF_SENSORS, default={}): SENSOR_SCHEMA,
     }
@@ -103,6 +109,9 @@ async def to_code(config):
 
     cg.add(db.set_url(f"{url}"))
     cg.add(db.set_publish_all(config[CONF_PUBLISH_ALL]))
+    cg.add(db.set_publish_all_numeric(config[CONF_PUBLISH_ALL_NUMERIC]))
+    cg.add(db.set_publish_all_binary(config[CONF_PUBLISH_ALL_BINARY]))
+    cg.add(db.set_publish_all_text(config[CONF_PUBLISH_ALL_TEXT]))
     default_measurement = config[CONF_MEASUREMENT]
     cg.add(db.set_measurement(default_measurement))
     cg.add(db.set_default_name_policy(config[CONF_DEFAULT_NAME_POLICY]))

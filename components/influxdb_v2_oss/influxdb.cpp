@@ -29,8 +29,8 @@ void InfluxDB::setup() {
     this->headers_.push_back(header);
   }
 
-  if (this->publish_all_) {
 #ifdef USE_BINARY_SENSOR
+  if (this->publish_all_ || this->publish_all_binary_) {
     for (auto *obj : App.get_binary_sensors()) {
       App.feed_wdt();
       if (!obj->is_internal() && std::none_of(this->fields_.begin(), this->fields_.end(), [&obj](Field* o) { return o->sensor_object_id() == obj->get_object_id(); })) {
@@ -43,8 +43,10 @@ void InfluxDB::setup() {
         this->add_field( field );
       }
     }
+  }
 #endif
 #ifdef USE_SENSOR
+  if (this->publish_all_ || this->publish_all_numeric_) {
     for (auto *obj : App.get_sensors()) {
       App.feed_wdt();
       if (!obj->is_internal() && std::none_of(this->fields_.begin(), this->fields_.end(), [&obj](Field* o) { return o->sensor_object_id() == obj->get_object_id(); })) {
@@ -57,8 +59,10 @@ void InfluxDB::setup() {
         this->add_field( field );
       }
     }
+  }
 #endif
 #ifdef USE_TEXT_SENSOR
+  if (this->publish_all_ || this->publish_all_text_) {
     for (auto *obj : App.get_text_sensors()) {
       App.feed_wdt();
       if (!obj->is_internal() && std::none_of(this->fields_.begin(), this->fields_.end(), [&obj](Field* o) { return o->sensor_object_id() == obj->get_object_id(); })) {
@@ -71,8 +75,8 @@ void InfluxDB::setup() {
         this->add_field( field );
       }
     }
-#endif
   }
+#endif
 
   for (auto field : this->fields_) {
     App.feed_wdt();
